@@ -5,7 +5,13 @@ const cors = require('cors');
 const app = express();
 const path = require("path");
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://safetyapp-frontend.onrender.com",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
