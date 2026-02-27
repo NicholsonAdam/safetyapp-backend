@@ -81,19 +81,6 @@ try {
 } catch (err) {
   console.error("Escalation email failed:", err);
 }
-  // --- Email Notification on Escalation ---
-try {
-  const newLeader = await getEmployeeById(toEmployeeId);
-  if (newLeader?.email) {
-    await sendEmail(
-      newLeader.email,
-      'Observation Escalated to You',
-      `An observation has been escalated and assigned to you. Reason: ${reason}`
-    );
-  }
-} catch (err) {
-  console.error("Escalation email failed:", err);
-}
 
   return { success: true };
 };

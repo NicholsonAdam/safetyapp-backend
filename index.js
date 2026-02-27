@@ -21,7 +21,7 @@ const testEmailRoute = require('./routes/testEmailRoute');
 const authRoute = require('./routes/auth');
 const supportRoutes = require('./routes/supportRoutes');
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // ⭐ SPECIFIC ROUTES FIRST
 

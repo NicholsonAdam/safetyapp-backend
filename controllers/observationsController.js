@@ -40,8 +40,7 @@ exports.updateObservationById = async (req, res, next) => {
   try {
     const id = req.params.id;
     const observation = req.body;
-
-    const updated = await observationsService.updateObservation(id, observation);
+    const updated = await updateObservation(id, observation); // <- use imported function
 
     if (!updated) {
       return res.status(404).json({

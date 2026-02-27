@@ -63,7 +63,7 @@ router.get("/", async (req, res) => {
 
       huddles.push({
         week,
-        pdf_url: `http://10.122.77.9:3000/huddles/pdf/Week${weekString}.pdf`,
+        pdf_url: `https://safetyapp-backend-xq88.onrender.com/huddles/pdf/Week${weekString}.pdf`,
       });
     }
 
@@ -141,7 +141,7 @@ for (const file of docxFiles) {
   huddles.push({
     week,
     year,
-    pdf_url: `http://10.122.77.9:3000/huddles/pdf/Week${weekString}.pdf`,
+    pdf_url: `https://safetyapp-backend-xq88.onrender.com/huddles/pdf/Week${weekString}.pdf`,
   });
 }
 

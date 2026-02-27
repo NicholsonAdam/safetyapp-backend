@@ -5,7 +5,7 @@ const { sendEmail } = require('../services/emailService');
 router.get('/test-email', async (req, res) => {
   try {
     await sendEmail(
-      process.env.EMAIL_USER, 
+      process.env.SMTP_USER, 
       'Safety App Test Email',
       'This is a test email from your Safety App backend.'
     );
