@@ -160,7 +160,7 @@ exports.getAllNearMiss = async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("Get All Near Miss Error:", err);
+    console.error("Get All Near Miss Error:", JSON.stringify(err));
     res.status(500).json({ error: "Failed to fetch reports" });
   }
 };
