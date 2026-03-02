@@ -14,6 +14,10 @@ exports.createSupport = async (req, res) => {
     const { submitter_id, submitter_name, date, platform, issue } = req.body;
     const photo = req.file ? req.file.filename : null;
 
+    // FIXED: Hardcoded backend base URL for correct photo rendering
+    const BASE_URL = "https://safetyapp-backend-xq88.onrender.com";
+    const photoUrl = photo ? `${BASE_URL}/uploads/${photo}` : null;
+
     let record = null;
     if (Support) {
       record = await Support.create({
@@ -40,9 +44,13 @@ exports.createSupport = async (req, res) => {
       <p><strong>Date:</strong> ${date}</p>
       <p><strong>Platform:</strong> ${platform}</p>
       <p><strong>Issue:</strong><br>${issue}</p>
+
       ${
         photo
-          ? `<p><strong>Photo:</strong> <a href="${process.env.API_URL}/uploads/${photo}">View Photo</a></p>`
+          ? `
+            <p><strong>Photo:</strong></p>
+            <img src="${photoUrl}" style="max-width: 400px; border: 1px solid #ccc; border-radius: 4px;" />
+          `
           : ""
       }
     `;
