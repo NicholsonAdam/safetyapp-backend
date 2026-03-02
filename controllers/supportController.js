@@ -49,7 +49,8 @@ exports.createSupport = async (req, res) => {
         photo
           ? `
             <p><strong>Photo:</strong></p>
-            <img src="${photoUrl}" style="max-width: 400px; border: 1px solid #ccc; border-radius: 4px;" />
+            <img src="https://safetyapp-backend-xq88.onrender.com/uploads/${photo}" 
+                style="max-width: 400px; border: 1px solid #ccc; border-radius: 4px;" />
           `
           : ""
       }
