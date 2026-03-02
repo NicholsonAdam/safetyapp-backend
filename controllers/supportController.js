@@ -42,21 +42,22 @@ exports.createSupport = async (req, res) => {
       },
     });
 
-    // FIXED EMAIL TEMPLATE — CLEAN, NO WHITESPACE ISSUES
-    const html = `
-      <h2>New Support Request</h2>
+    // *** FIXED EMAIL TEMPLATE ***
+    // No ternary. No whitespace. No indentation. Gmail-safe.
+    let photoBlock = "";
+    if (photoUrl) {
+      photoBlock =
+        `<p><strong>Photo:</strong></p>` +
+        `<img src="${photoUrl}" style="max-width:400px;border:1px solid #ccc;border-radius:4px;" />`;
+    }
 
-      <p><strong>Submitted By:</strong> ${submitter_name} (${submitter_id})</p>
-      <p><strong>Date:</strong> ${date}</p>
-      <p><strong>Platform:</strong> ${platform}</p>
-      <p><strong>Issue:</strong><br>${issue}</p>
-
-      ${photo ? `
-        <p><strong>Photo:</strong></p>
-        <img src="${photoUrl}"
-             style="max-width: 400px; border: 1px solid #ccc; border-radius: 4px;" />
-      ` : ""}
-    `;
+    const html =
+      `<h2>New Support Request</h2>` +
+      `<p><strong>Submitted By:</strong> ${submitter_name} (${submitter_id})</p>` +
+      `<p><strong>Date:</strong> ${date}</p>` +
+      `<p><strong>Platform:</strong> ${platform}</p>` +
+      `<p><strong>Issue:</strong><br>${issue}</p>` +
+      photoBlock;
 
     // Send email
     await transporter.sendMail({
