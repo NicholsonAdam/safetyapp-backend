@@ -12,12 +12,15 @@ try {
 exports.createSupport = async (req, res) => {
   try {
     const { submitter_id, submitter_name, date, platform, issue } = req.body;
+
+    // Multer file
     const photo = req.file ? req.file.filename : null;
 
-    // FIXED: Hardcoded backend base URL for correct photo rendering
+    // Base URL for images
     const BASE_URL = "https://safetyapp-backend-xq88.onrender.com";
     const photoUrl = photo ? `${BASE_URL}/uploads/${photo}` : null;
 
+    // Optional DB record
     let record = null;
     if (Support) {
       record = await Support.create({
@@ -28,6 +31,7 @@ exports.createSupport = async (req, res) => {
       });
     }
 
+    // Email transport
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
@@ -38,24 +42,23 @@ exports.createSupport = async (req, res) => {
       },
     });
 
+    // FIXED EMAIL TEMPLATE — CLEAN, NO WHITESPACE ISSUES
     const html = `
       <h2>New Support Request</h2>
+
       <p><strong>Submitted By:</strong> ${submitter_name} (${submitter_id})</p>
       <p><strong>Date:</strong> ${date}</p>
       <p><strong>Platform:</strong> ${platform}</p>
       <p><strong>Issue:</strong><br>${issue}</p>
 
-      ${
-        photo
-          ? `
-            <p><strong>Photo:</strong></p>
-            <img src="https://safetyapp-backend-xq88.onrender.com/uploads/${photo}" 
-                style="max-width: 400px; border: 1px solid #ccc; border-radius: 4px;" />
-          `
-          : ""
-      }
+      ${photo ? `
+        <p><strong>Photo:</strong></p>
+        <img src="${photoUrl}"
+             style="max-width: 400px; border: 1px solid #ccc; border-radius: 4px;" />
+      ` : ""}
     `;
 
+    // Send email
     await transporter.sendMail({
       from: process.env.SMTP_USER,
       to: "adam.nicholson1@daltile.com",
@@ -64,6 +67,7 @@ exports.createSupport = async (req, res) => {
     });
 
     res.json({ success: true, id: record ? record.id : null });
+
   } catch (err) {
     console.error("Support Create Error:", err);
     res.status(500).json({ error: "Failed to submit support request" });
