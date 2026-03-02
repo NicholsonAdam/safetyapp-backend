@@ -21,7 +21,7 @@ function buildEmailTemplate(title, messageBody) {
 
 exports.sendEmail = async (to, subject, messageBody) => {
   const transporter = nodemailer.createTransport({
-    service: "smtp.gmail.com",
+    host: "smtp.gmail.com",
     port: 587,
     secure: false, //STARTTLS
     auth: {
