@@ -13,6 +13,9 @@ exports.createSupport = async (req, res) => {
   try {
     const { submitter_id, submitter_name, date, platform, issue } = req.body;
 
+    // DEBUG: what does Multer actually see?
+    console.log("SUPPORT REQ.FILE =", req.file);
+
     // Multer file
     const photo = req.file ? req.file.filename : null;
 
@@ -31,7 +34,6 @@ exports.createSupport = async (req, res) => {
       });
     }
 
-    // Email transport
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
@@ -42,8 +44,7 @@ exports.createSupport = async (req, res) => {
       },
     });
 
-    // *** FIXED EMAIL TEMPLATE ***
-    // No ternary. No whitespace. No indentation. Gmail-safe.
+    // Build photo block + always show URL text for debugging
     let photoBlock = "";
     if (photoUrl) {
       photoBlock =
@@ -57,9 +58,9 @@ exports.createSupport = async (req, res) => {
       `<p><strong>Date:</strong> ${date}</p>` +
       `<p><strong>Platform:</strong> ${platform}</p>` +
       `<p><strong>Issue:</strong><br>${issue}</p>` +
+      `<p><strong>Photo URL (debug):</strong> ${photoUrl || "NONE"}</p>` +
       photoBlock;
 
-    // Send email
     await transporter.sendMail({
       from: process.env.SMTP_USER,
       to: "adam.nicholson1@daltile.com",
@@ -68,7 +69,6 @@ exports.createSupport = async (req, res) => {
     });
 
     res.json({ success: true, id: record ? record.id : null });
-
   } catch (err) {
     console.error("Support Create Error:", err);
     res.status(500).json({ error: "Failed to submit support request" });
