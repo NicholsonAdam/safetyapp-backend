@@ -236,7 +236,7 @@ exports.insertBBS = async (data, photoFile) => {
     console.log("SMTP_USER:", process.env.SMTP_USER);
     console.log("SMTP_PASS:", process.env.SMTP_PASS ? "Loaded" : "Missing");
     const transporter = nodemailer.createTransport({
-      host: "smtp.office365.com",
+      host: "smtp.gmail.com",
       port: 587,
       secure: false,
       auth: {
