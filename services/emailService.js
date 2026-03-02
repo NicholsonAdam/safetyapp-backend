@@ -21,7 +21,9 @@ function buildEmailTemplate(title, messageBody) {
 
 exports.sendEmail = async (to, subject, messageBody) => {
   const transporter = nodemailer.createTransport({
-    service: 'Outlook365',
+    service: "smtp.gmail.com",
+    port: 587,
+    secure: false, //STARTTLS
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
