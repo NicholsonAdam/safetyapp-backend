@@ -14,9 +14,6 @@ app.use(
   })
 );
 
-// ⭐ REQUIRED FOR PREFLIGHT
-app.options("/*", cors());
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
