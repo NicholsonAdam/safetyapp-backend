@@ -33,7 +33,7 @@ exports.createBBS = async (req, res) => {
       try {
         // 1. Lookup leader email
         const leaderQuery = await pool.query(
-          "SELECT email FROM employees WHERE id = $1",
+          "SELECT email FROM employees WHERE employee_id = $1",
           [data.leader_id]
         );
 
