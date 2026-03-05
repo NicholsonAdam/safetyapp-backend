@@ -5,13 +5,18 @@ const cors = require('cors');
 const app = express();
 const path = require("path");
 
+// ⭐ FIXED CORS — PATCH ADDED + OPTIONS ENABLED
 app.use(
   cors({
     origin: "https://safetyapp-frontend.onrender.com",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// ⭐ REQUIRED FOR PREFLIGHT
+app.options("*", cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -30,7 +35,6 @@ const supportRoutes = require('./routes/supportRoutes');
 const PORT = process.env.PORT || 3000;
 
 // ⭐ SPECIFIC ROUTES FIRST
-
 app.use('/api/observations', observationsRoute);
 app.use('/api/dbtest', dbTestRoute);
 app.use('/api/assignments', assignmentsRoute);
