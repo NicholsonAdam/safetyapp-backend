@@ -24,10 +24,10 @@ router.post("/login", async (req, res) => {
         // Pull employee record
         const result = await pool.query(
             `SELECT employee_id, name, department, job_title, email, site_admin,
-                    active, password_hash, must_change_password,
+                    leader_id, active, password_hash, must_change_password,
                     failed_attempts, last_failed_attempt
-             FROM employees
-             WHERE employee_id = $1`,
+            FROM employees
+            WHERE employee_id = $1`,
             [employeeId]
         );
 
@@ -87,7 +87,8 @@ router.post("/login", async (req, res) => {
                 must_change_password: true,
                 employee: {
                     employee_id: emp.employee_id,
-                    name: emp.name
+                    name: emp.name,
+                    leader_id: emp.leader_id
                 }
             });
         }
@@ -110,7 +111,8 @@ router.post("/login", async (req, res) => {
                 department: emp.department,
                 job_title: emp.job_title,
                 email: emp.email,
-                site_admin: emp.site_admin
+                site_admin: emp.site_admin,
+                leader_id: emp.leader_id
             }
         });
 
