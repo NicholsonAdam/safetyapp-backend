@@ -38,7 +38,7 @@ exports.createNearMiss = async (req, res) => {
     const reportTypesRaw = req.body.reportTypes;
     const normalizedTypes = normalizeReportTypes(reportTypesRaw);
 
-    const photoPath = req.file ? req.file.filename : null;
+    const photo = req.file ? req.file.filename : null;
 
     // Lookup leader of the observer
     const leaderResult = await pool.query(
@@ -203,7 +203,7 @@ exports.updateNearMiss = async (req, res) => {
     const reportTypesRaw = req.body.reportTypes;
     const normalizedTypes = normalizeReportTypes(reportTypesRaw);
 
-    const photoPath = req.file ? req.file.filename : null;
+    const photo = req.file ? req.file.filename : null;
 
     const result = await pool.query(
       `UPDATE nearmiss_reports SET

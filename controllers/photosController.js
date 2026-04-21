@@ -16,12 +16,11 @@ exports.uploadPhotoForObservation = async (req, res, next) => {
       });
     }
 
-    // Save file to disk
-    const fileName = `observation-${observationId}-${Date.now()}-${file.originalname}`;
-    const filePath = getPhotoFilePath(fileName);
-    fs.writeFileSync(filePath, file.buffer);
+    const filename = req.file.filename;
 
-    // Build URL
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const url = `${baseUrl}/files/${filename}`;
+
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const url = `${baseUrl}/api/photos/${fileName}`;
 
@@ -62,20 +61,11 @@ exports.getPhotosForObservationController = async (req, res, next) => {
 // -----------------------------------------------------
 // SERVE a photo file
 // -----------------------------------------------------
-exports.servePhotoFile = (req, res, next) => {
-  try {
-    const fileName = req.params.fileName;
-    const fullPath = getPhotoFilePath(fileName);
-
-    if (!fs.existsSync(fullPath)) {
-      return res.status(404).send('File not found');
-    }
-
-    res.sendFile(path.resolve(fullPath));
-  } catch (err) {
-    next(err);
-  }
+exports.servePhotoFile = (req, res) => {
+  const filePath = path.join("/data/uploads", req.params.fileName);
+  res.sendFile(filePath);
 };
+
 
 // -----------------------------------------------------
 // DELETE a photo
@@ -93,16 +83,13 @@ exports.deletePhotoController = async (req, res) => {
       });
     }
 
-    // Extract filename from URL
-    const fileName = photo.url.split('/').pop();
-    const filePath = getPhotoFilePath(fileName);
+    const filename = photo.file_name || photo.filename || photo.url.split("/").pop();
+    const filePath = path.join("/data/uploads", filename);
 
-    // 2. Delete the file from disk
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
-    // 3. Delete the DB row
     await deletePhotoById(id);
 
     return res.json({

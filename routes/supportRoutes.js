@@ -5,17 +5,7 @@ const { createSupport } = require("../controllers/supportController");
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "..", "uploads"));
-  },
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + file.originalname;
-    cb(null, unique);
-  }
-});
-
-const upload = multer({ storage });
+const upload = require("../middleware/upload");
 
 router.post("/create", upload.single("photo"), createSupport);
 

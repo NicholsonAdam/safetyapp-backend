@@ -1,13 +1,13 @@
 const pool = require('../config/db');
 
-exports.savePhotoRecord = async (observationId, url) => {
+exports.savePhotoRecord = async (observationId, filename, url) => {
   const query = `
-    INSERT INTO photos (observation_id, url)
-    VALUES ($1, $2)
+    INSERT INTO photos (observation_id, filename, url)
+    VALUES ($1, $2, $3)
     RETURNING *
   `;
 
-  const values = [observationId, url];
+  const values = [observationId, filename, url];
 
   const result = await pool.query(query, values);
 

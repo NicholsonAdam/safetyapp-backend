@@ -17,6 +17,12 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ⭐ FILE SERVING FOR PERMANENT UPLOADS
+app.get("/files/:filename", (req, res) => {
+  const filePath = path.join("/data/uploads", req.params.filename);
+  res.sendFile(filePath);
+});
+
 // ROUTES
 const healthcheckRoute = require('./routes/healthcheck');
 const observationsRoute = require('./routes/observations');

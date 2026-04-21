@@ -3,7 +3,7 @@ const pool = require("../config/db.js");
 // CREATE
 const createInspection = async (req, res) => {
   try {
-    const photoPath = req.file ? req.file.filename : null;
+    const photo = req.file ? req.file.filename : null;
     const f = req.body;
 
     const values = [

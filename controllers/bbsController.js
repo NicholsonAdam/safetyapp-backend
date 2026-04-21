@@ -21,7 +21,7 @@ exports.getAllBBS = async (req, res) => {
 exports.createBBS = async (req, res) => {
   try {
     const data = req.body;
-    const photoFile = req.file || null;
+    const photo = req.file ? req.file.filename : null;
 
     // Insert into DB
     const newRecord = await insertBBS(data, photoFile);
