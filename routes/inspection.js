@@ -6,8 +6,6 @@ const path = require("path");
 
 const upload = require("../middleware/upload");
 
-const upload = multer({ storage });
-
 const {
   createInspection,
   getAllInspections,
