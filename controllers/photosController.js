@@ -21,9 +21,6 @@ exports.uploadPhotoForObservation = async (req, res, next) => {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const url = `${baseUrl}/files/${filename}`;
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const url = `${baseUrl}/api/photos/${fileName}`;
-
     // Save DB record
     const savedPhoto = await savePhotoRecord(observationId, fileName, url);
 
