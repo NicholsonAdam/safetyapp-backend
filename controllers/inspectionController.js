@@ -43,7 +43,8 @@ const createInspection = async (req, res) => {
         q7, q7_corrected,
         q8, q8_corrected,
         q9, q9_corrected,
-        q10, q10_corrected
+        q10, q10_corrected,
+        created_at
       )
       VALUES (
         $1, $2, $3, $4, $5, $6,
@@ -54,7 +55,8 @@ const createInspection = async (req, res) => {
         $15, $16,
         $17, $18,
         $19, $20,
-        $21, $22
+        $21, $22,
+        NOW()
       )
       RETURNING *;
     `;
