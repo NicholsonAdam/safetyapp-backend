@@ -9,25 +9,36 @@ const createInspection = async (req, res) => {
     const f = req.body;
 
     const values = [
-      f.inspector_id,
-      f.inspector_name,
-      f.date,
-      f.department,
-      f.area,
-      f.shift,
-      f.inspector_comments,
-      photoPath,
+      f.inspector_id,          // $1
+      f.inspector_name,        // $2
+      f.date,                  // $3
+      f.department,            // $4
+      f.area,                  // $5
+      f.shift,                 // $6
+      f.inspector_comments,    // $7
+      photoPath,               // $8
 
-      f.q1, f.q1_corrected,
-      f.q2, f.q2_corrected,
-      f.q3, f.q3_corrected,
-      f.q4, f.q4_corrected,
-      f.q5, f.q5_corrected,
-      f.q6, f.q6_corrected,
-      f.q7, f.q7_corrected,
-      f.q8, f.q8_corrected,
-      f.q9, f.q9_corrected,
-      f.q10, f.q10_corrected
+      f.q1,                    // $9
+      f.q1_corrected,          // $10
+      f.q2,                    // $11
+      f.q2_corrected,          // $12
+      f.q3,                    // $13
+      f.q3_corrected,          // $14
+      f.q4,                    // $15
+      f.q4_corrected,          // $16
+      f.q5,                    // $17
+      f.q5_corrected,          // $18
+      f.q6,                    // $19
+      f.q6_corrected,          // $20
+      f.q7,                    // $21
+      f.q7_corrected,          // $22
+      f.q8,                    // $23
+      f.q8_corrected,          // $24
+      f.q9,                    // $25
+      f.q9_corrected,          // $26
+      f.q10,                   // $27
+      f.q10_corrected          // $28
+      // created_at is NOW()
     ];
 
     const sql = `
@@ -56,6 +67,9 @@ const createInspection = async (req, res) => {
         $17, $18,
         $19, $20,
         $21, $22,
+        $23, $24,
+        $25, $26,
+        $27, $28,
         NOW()
       )
       RETURNING *;
