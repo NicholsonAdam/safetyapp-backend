@@ -16,13 +16,15 @@ exports.uploadPhotoForObservation = async (req, res, next) => {
       });
     }
 
-    const filename = req.file.filename;
+    // Correct variable name
+    const filename = file.filename;
 
+    // Correct single baseUrl + files path
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const url = `${baseUrl}/files/${filename}`;
 
-    // Save DB record
-    const savedPhoto = await savePhotoRecord(observationId, fileName, url);
+    // Save DB record with correct variable
+    const savedPhoto = await savePhotoRecord(observationId, filename, url);
 
     res.json({
       status: 'success',
@@ -37,6 +39,7 @@ exports.uploadPhotoForObservation = async (req, res, next) => {
     next(err);
   }
 };
+
 // -----------------------------------------------------
 // GET all photos for an observation
 // -----------------------------------------------------
@@ -63,7 +66,6 @@ exports.servePhotoFile = (req, res) => {
   res.sendFile(filePath);
 };
 
-
 // -----------------------------------------------------
 // DELETE a photo
 // -----------------------------------------------------
@@ -71,7 +73,6 @@ exports.deletePhotoController = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Look up the photo in the DB
     const photo = await getPhotoById(id);
     if (!photo) {
       return res.status(404).json({
