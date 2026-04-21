@@ -1,9 +1,10 @@
 const pool = require("../config/db.js");
 
-// CREATE
+// =========================
+// CREATE INSPECTION
+// =========================
 const createInspection = async (req, res) => {
   try {
-    // New photo system
     const photoPath = req.file ? req.file.filename : null;
     const f = req.body;
 
@@ -65,4 +66,66 @@ const createInspection = async (req, res) => {
     console.error("Error creating inspection:", err);
     res.status(500).json({ error: "Server error" });
   }
+};
+
+// =========================
+// GET ALL
+// =========================
+const getAllInspections = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM inspection_checklists ORDER BY date DESC;"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching inspections:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// =========================
+// GET ONE
+// =========================
+const getInspectionById = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM inspection_checklists WHERE id = $1;",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error fetching inspection:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// =========================
+// UPDATE STATUS
+// =========================
+const updateInspectionStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    const result = await pool.query(
+      "UPDATE inspection_checklists SET status = $1 WHERE id = $2 RETURNING *;",
+      [status, req.params.id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating inspection status:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+module.exports = {
+  createInspection,
+  getAllInspections,
+  getInspectionById,
+  updateInspectionStatus
 };

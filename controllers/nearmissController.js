@@ -40,24 +40,20 @@ exports.createNearMiss = async (req, res) => {
     const reportTypesRaw = req.body.reportTypes;
     const normalizedTypes = normalizeReportTypes(reportTypesRaw);
 
-    // New photo system
     const photoPath = req.file ? req.file.filename : null;
 
-    // Lookup leader
     const leaderResult = await pool.query(
       `SELECT leader_id FROM employees WHERE employee_id = $1`,
       [observer_id]
     );
     const leaderId = leaderResult.rows[0]?.leader_id || null;
 
-    // Lookup shift
     const shiftResult = await pool.query(
       `SELECT shift FROM employees WHERE employee_id = $1`,
       [observer_id]
     );
     const employeeShift = shiftResult.rows[0]?.shift || null;
 
-    // Insert record
     const result = await pool.query(
       `INSERT INTO nearmiss_reports 
       (observer_id, observer_name, department, location, date, shift,
@@ -86,9 +82,6 @@ exports.createNearMiss = async (req, res) => {
 
     const saved = result.rows[0];
 
-    // =========================
-    // FOLLOW-UP EMAIL
-    // =========================
     if (followup === "yes") {
       try {
         let leaderEmail = null;
@@ -153,5 +146,122 @@ exports.createNearMiss = async (req, res) => {
   } catch (err) {
     console.error("Create Near Miss Error:", err);
     res.status(500).json({ error: "Failed to create Near Miss report" });
+  }
+};
+
+// =========================
+// GET ALL
+// =========================
+exports.getAllNearMiss = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM nearmiss_reports ORDER BY id DESC"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Get All Near Miss Error:", err);
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+};
+
+// =========================
+// GET ONE
+// =========================
+exports.getNearMissById = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM nearmiss_reports WHERE id = $1",
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Get Near Miss Error:", err);
+    res.status(500).json({ error: "Failed to fetch report" });
+  }
+};
+
+// =========================
+// UPDATE
+// =========================
+exports.updateNearMiss = async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const {
+      department,
+      location,
+      date,
+      additionalTeam,
+      description,
+      actionsTaken,
+      suggestion,
+      followup,
+      status,
+      shift
+    } = req.body;
+
+    const reportTypesRaw = req.body.reportTypes;
+    const normalizedTypes = normalizeReportTypes(reportTypesRaw);
+
+    const photoPath = req.file ? req.file.filename : null;
+
+    const result = await pool.query(
+      `UPDATE nearmiss_reports SET
+        department = $1,
+        location = $2,
+        date = $3,
+        additional_team = $4,
+        report_types = $5,
+        description = $6,
+        actions_taken = $7,
+        suggestion = $8,
+        followup = $9,
+        status = $10,
+        shift = $11,
+        photo_path = COALESCE($12, photo_path),
+        updated_at = NOW()
+      WHERE id = $13
+      RETURNING *`,
+      [
+        department,
+        location,
+        date,
+        additionalTeam,
+        JSON.stringify(normalizedTypes),
+        description,
+        actionsTaken,
+        suggestion,
+        followup,
+        status,
+        shift,
+        photoPath,
+        id
+      ]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Update Near Miss Error:", err);
+    res.status(500).json({ error: "Failed to update report" });
+  }
+};
+
+// =========================
+// DELETE
+// =========================
+exports.deleteNearMiss = async (req, res) => {
+  try {
+    await pool.query("DELETE FROM nearmiss_reports WHERE id = $1", [
+      req.params.id,
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete Near Miss Error:", err);
+    res.status(500).json({ error: "Failed to delete report" });
   }
 };
