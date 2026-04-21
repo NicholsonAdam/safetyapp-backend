@@ -1,9 +1,14 @@
 require('dotenv').config();
 
+const fs = require("fs");
 const express = require('express');
 const cors = require('cors');
 const app = express();
 const path = require("path");
+
+// Ensure /data/uploads exists
+const uploadDir = "/data/uploads";
+fs.mkdirSync(uploadDir, { recursive: true });
 
 // ⭐ FIXED CORS — PATCH ADDED + OPTIONS ENABLED
 app.use(
