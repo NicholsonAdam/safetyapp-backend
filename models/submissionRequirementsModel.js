@@ -1,4 +1,4 @@
-const pool = require('../db');
+const pool = require('../config/db');
 
 // Get all submission requirements with employee + leader info
 const getAllSubmissionRequirements = async () => {
