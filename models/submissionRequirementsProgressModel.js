@@ -39,7 +39,7 @@ exports.getSubmissionProgress = async (month, year) => {
 
     const bbs = await countSubmissions("bbs_observations", "observer_id", id, month, year);
     const nm  = await countSubmissions("nearmiss_reports", "observer_id", id, month, year);
-    const ins = await countSubmissions("inspection_checklists", "observer_id", id, month, year);
+    const ins = await countSubmissions("inspection_checklists", "inspector_id", id, month, year);
 
     r.actual_submissions = bbs + nm + ins;
   }
