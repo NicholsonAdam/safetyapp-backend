@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const pool = require('../config/db');
+const pool = require('../backend/config/db.js');
 
 const runMonthlyRollover = async () => {
     try {
