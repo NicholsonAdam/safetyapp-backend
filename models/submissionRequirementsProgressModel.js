@@ -27,6 +27,7 @@ exports.getSubmissionProgress = async (month, year) => {
       ON sr.employee_id = e.employee_id 
       AND sr.month = $1 
       AND sr.year = $2
+    WHERE e.active = TRUE
     ORDER BY e.employee_id;
   `;
 
