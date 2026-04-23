@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-// Helper to get submission counts from a table
+// Helper to count submissions in each table
 async function countSubmissions(table, employeeField, employeeId, month, year) {
   const query = `
     SELECT COUNT(*) AS count
@@ -14,12 +14,12 @@ async function countSubmissions(table, employeeField, employeeId, month, year) {
 }
 
 exports.getSubmissionProgress = async (month, year) => {
-  // 1. Get all employees + required counts
+  // 1. Pull employees + leader names + required counts
   const baseQuery = `
     SELECT 
       e.employee_id,
-      e.employee_name,
-      l.employee_name AS leader_name,
+      e.name AS employee_name,
+      l.name AS leader_name,
       sr.required_count
     FROM employees e
     LEFT JOIN employees l ON e.leader_id = l.employee_id
@@ -33,7 +33,7 @@ exports.getSubmissionProgress = async (month, year) => {
   const baseResult = await pool.query(baseQuery, [month, year]);
   const rows = baseResult.rows;
 
-  // 2. For each employee, count submissions
+  // 2. Count submissions for each employee
   for (const r of rows) {
     const id = r.employee_id;
 
