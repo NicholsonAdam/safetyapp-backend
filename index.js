@@ -40,6 +40,9 @@ const testEmailRoute = require('./routes/testEmailRoute');
 const authRoute = require('./routes/auth');
 const supportRoutes = require('./routes/supportRoutes');
 
+// ⭐ LOAD MONTHLY ROLLOVER CRON JOB
+require('./cron/submissionRequirementsCron');
+
 const PORT = process.env.PORT || 3000;
 
 // ⭐ SPECIFIC ROUTES FIRST
@@ -56,6 +59,7 @@ app.use("/api/employees", require("./routes/employeesExport"));
 app.use('/api/bbs', require('./routes/bbs'));
 app.use("/api/nearmiss", require("./routes/nearmiss"));
 app.use("/api/inspection", require("./routes/inspection"));   // ⭐ NOW THIS WORKS
+app.use('/api/submission-requirements', require('./routes/submissionRequirements'));
 
 // ⭐ GENERIC /api ROUTES LAST
 app.use('/api', healthcheckRoute);
