@@ -39,6 +39,11 @@ const escalationRoute = require('./routes/escalationRoutes');
 const testEmailRoute = require('./routes/testEmailRoute');
 const authRoute = require('./routes/auth');
 const supportRoutes = require('./routes/supportRoutes');
+const documentFoldersRoutes = require("./routes/documentFolders");
+const documentsRoutes = require("./routes/documents");
+const documentVersionsRoutes = require("./routes/documentVersions");
+const trainingRoutes = require("./routes/training");
+const documentSignaturesRoutes = require("./routes/documentSignatures");
 
 // ⭐ LOAD MONTHLY ROLLOVER CRON JOB
 require('./cron/submissionRequirementsCron');
@@ -60,6 +65,11 @@ app.use('/api/bbs', require('./routes/bbs'));
 app.use("/api/nearmiss", require("./routes/nearmiss"));
 app.use("/api/inspection", require("./routes/inspection"));   // ⭐ NOW THIS WORKS
 app.use('/api/submission-requirements', require('./routes/submissionRequirements'));
+app.use("/api/folders", documentFoldersRoutes);
+app.use("/api/documents", documentsRoutes);
+app.use("/api/documentVersions", documentVersionsRoutes);
+app.use("/api/signatures", documentSignaturesRoutes);
+app.use("/api/training", trainingRoutes);
 
 // ⭐ GENERIC /api ROUTES LAST
 app.use('/api', healthcheckRoute);
