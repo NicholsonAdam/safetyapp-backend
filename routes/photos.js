@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const upload = require("../middleware/upload");
+const { uploadPhotos } = require("../middleware/upload");
 
 const {
   uploadPhotoForObservation,
@@ -10,7 +10,7 @@ const {
   deletePhotoController
 } = require('../controllers/photosController');
 
-router.post('/observations/:id/photo', upload.single('photo'), uploadPhotoForObservation);
+router.post('/observations/:id/photo', uploadPhotos.single('photo'), uploadPhotoForObservation);
 
 router.get('/observations/:id/photos', getPhotosForObservationController);
 

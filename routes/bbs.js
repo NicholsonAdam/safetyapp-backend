@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 
-const upload = require("../middleware/upload");
+const { uploadPhotos } = require("../middleware/upload");
 
 const { getAllBBS, createBBS, updateBBSStatus } = require('../controllers/bbsController');
 
@@ -10,7 +9,7 @@ const { getAllBBS, createBBS, updateBBSStatus } = require('../controllers/bbsCon
 router.get('/', getAllBBS);
 
 // POST new BBS observation (with optional photo)
-router.post('/', upload.single('photo'), createBBS);
+router.post('/', uploadPhotos.single('photo'), createBBS);
 
 router.patch('/:id', updateBBSStatus);
 

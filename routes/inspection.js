@@ -1,10 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 
-const path = require("path");
-
-const upload = require("../middleware/upload");
+const { uploadPhotos } = require("../middleware/upload");
 
 const {
   createInspection,
@@ -20,7 +17,7 @@ router.get('/', getAllInspections);
 router.get('/:id', getInspectionById);
 
 // POST new inspection (with optional photo)
-router.post('/', upload.single('photo'), createInspection);
+router.post('/', uploadPhotos.single('photo'), createInspection);
 
 // UPDATE status
 router.patch('/:id', updateInspectionStatus);
