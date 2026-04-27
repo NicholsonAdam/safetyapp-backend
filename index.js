@@ -80,6 +80,8 @@ app.use('/api', testEmailRoute);
 app.use('/api', photosRoute);
 
 // STATIC FILES
+// ⭐ STATIC FILE SERVING FOR DOCUMENTS (FINAL FIX)
+app.use("/api/data/documents", express.static("/data/documents"));
 app.use("/huddles/pdf", express.static(path.join(__dirname, "huddles/pdf")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
