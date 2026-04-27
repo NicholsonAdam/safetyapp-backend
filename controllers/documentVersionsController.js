@@ -1,42 +1,98 @@
-const service = require("../services/documentService");
+const versionService = require("../services/versionService");
+const { exec } = require("child_process");
+const path = require("path");
+const fs = require("fs");
 
-exports.getAllFolders = async (req, res) => {
-  const result = await service.getAllFolders();
+// Detect Office file types
+const isOfficeFile = mimetype => {
+  if (!mimetype) return false;
+
+  const officeTypes = [
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  ];
+
+  return officeTypes.includes(mimetype);
+};
+
+// Convert Office → PDF using LibreOffice
+const convertToPdf = inputPath => {
+  return new Promise((resolve, reject) => {
+    const dir = path.dirname(inputPath);
+    const cmd = `soffice --headless --convert-to pdf --outdir "${dir}" "${inputPath}"`;
+
+    exec(cmd, (error, stdout, stderr) => {
+      if (error) {
+        console.error("LibreOffice conversion error:", error);
+        console.error("stderr:", stderr);
+        return reject(error);
+      }
+
+      const baseName = path.basename(inputPath, path.extname(inputPath));
+      const pdfPath = path.join(dir, `${baseName}.pdf`);
+
+      fs.access(pdfPath, fs.constants.F_OK, err => {
+        if (err) {
+          console.error("Converted PDF not found:", pdfPath);
+          return reject(new Error("PDF conversion failed"));
+        }
+        resolve(pdfPath);
+      });
+    });
+  });
+};
+
+// ------------------------------
+// CONTROLLER FUNCTIONS
+// ------------------------------
+
+exports.getVersions = async (req, res) => {
+  const result = await versionService.getVersions(req.params.documentId);
   res.json(result.rows);
 };
 
-exports.getFolderById = async (req, res) => {
-  const result = await service.getFolderById(req.params.id);
+exports.getVersionById = async (req, res) => {
+  const result = await versionService.getVersionById(req.params.versionId);
   res.json(result.rows[0]);
 };
 
-exports.createFolder = async (req, res) => {
-  const { name, description, parent_folder_id, created_by } = req.body;
+exports.uploadNewVersion = async (req, res) => {
+  try {
+    const documentId = req.params.documentId;
+    const uploadedBy = req.body.uploaded_by;
+    const changeComment = req.body.change_comment;
 
-  const result = await service.createFolder(
-    name,
-    description,
-    parent_folder_id,
-    created_by
-  );
+    let filePath = req.file.path;
+    let fileType = req.file.mimetype;
 
-  res.json(result.rows[0]);
-};
+    // Convert Office files to PDF
+    if (isOfficeFile(fileType)) {
+      console.log("Office file detected, converting to PDF:", filePath);
 
-exports.updateFolder = async (req, res) => {
-  const { name, description, parent_folder_id } = req.body;
+      const pdfPath = await convertToPdf(filePath);
 
-  const result = await service.updateFolder(
-    req.params.id,
-    name,
-    description,
-    parent_folder_id
-  );
+      filePath = pdfPath;
+      fileType = "application/pdf";
+    }
 
-  res.json(result.rows[0]);
-};
+    const nextVersion = await versionService.getNextVersionNumber(documentId);
 
-exports.deleteFolder = async (req, res) => {
-  await service.deleteFolder(req.params.id);
-  res.json({ success: true });
+    const result = await versionService.insertVersion(
+      documentId,
+      nextVersion,
+      filePath,
+      fileType,
+      uploadedBy,
+      changeComment
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error uploading new version:", err);
+    res.status(500).json({ error: "Failed to upload new version" });
+  }
 };
