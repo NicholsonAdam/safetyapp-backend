@@ -1,32 +1,42 @@
-const versionService = require("../services/versionService");
+const service = require("../services/documentService");
 
-exports.getVersions = async (req, res) => {
-  const result = await versionService.getVersions(req.params.documentId);
+exports.getAllFolders = async (req, res) => {
+  const result = await service.getAllFolders();
   res.json(result.rows);
 };
 
-exports.getVersionById = async (req, res) => {
-  const result = await versionService.getVersionById(req.params.versionId);
+exports.getFolderById = async (req, res) => {
+  const result = await service.getFolderById(req.params.id);
   res.json(result.rows[0]);
 };
 
-exports.uploadNewVersion = async (req, res) => {
-  const documentId = req.params.documentId;
-  const uploadedBy = req.body.uploaded_by;
-  const changeComment = req.body.change_comment;
-  const filePath = req.file.path;
-  const fileType = req.file.mimetype;
+exports.createFolder = async (req, res) => {
+  const { name, description, parent_folder_id, created_by } = req.body;
 
-  const nextVersion = await versionService.getNextVersionNumber(documentId);
-
-  const result = await versionService.insertVersion(
-    documentId,
-    nextVersion,
-    filePath,
-    fileType,
-    uploadedBy,
-    changeComment
+  const result = await service.createFolder(
+    name,
+    description,
+    parent_folder_id,
+    created_by
   );
 
   res.json(result.rows[0]);
+};
+
+exports.updateFolder = async (req, res) => {
+  const { name, description, parent_folder_id } = req.body;
+
+  const result = await service.updateFolder(
+    req.params.id,
+    name,
+    description,
+    parent_folder_id
+  );
+
+  res.json(result.rows[0]);
+};
+
+exports.deleteFolder = async (req, res) => {
+  await service.deleteFolder(req.params.id);
+  res.json({ success: true });
 };
