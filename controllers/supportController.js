@@ -20,7 +20,7 @@ exports.createSupport = async (req, res) => {
     const photo = req.file ? req.file.filename : null;
 
     // Base URL for images
-    const BASE_URL = "https://safetyapp-backend-xq88.onrender.com";
+    const BASE_URL = "https://safetyapp-backend-docker.onrender.com";
     const photoUrl = photo ? `${BASE_URL}/uploads/${photo}` : null;
 
     // Optional DB record
