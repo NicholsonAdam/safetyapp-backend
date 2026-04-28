@@ -15,7 +15,7 @@ app.use(
   cors({
     origin: "https://safetyapp-frontend.onrender.com",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "employee_id"],
   })
 );
 
