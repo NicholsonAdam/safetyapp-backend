@@ -95,3 +95,83 @@ exports.logScan = async (req, res) => {
 
   res.json(result.rows[0]);
 };
+
+// GET ALL REPORTS
+exports.getReports = async (req, res) => {
+  const result = await db.query(
+    `SELECT *
+     FROM attendance_reports
+     ORDER BY created_at DESC`
+  );
+
+  res.json(result.rows);
+};
+
+// GET REPORT DETAILS
+exports.getReportDetails = async (req, res) => {
+  const reportId = req.params.id;
+
+  // Get report metadata
+  const report = await db.query(
+    `SELECT *
+     FROM attendance_reports
+     WHERE id = $1`,
+    [reportId]
+  );
+
+  if (report.rows.length === 0) {
+    return res.status(404).json({ error: "Report not found" });
+  }
+
+  const r = report.rows[0];
+
+  // PLANT MEETING REPORT
+  if (r.type === "PLANT_MEETING") {
+    const employees = await db.query(
+      `SELECT employee_id, first_name, last_name
+       FROM employees
+       ORDER BY employee_id`
+    );
+
+    const scans = await db.query(
+      `SELECT employee_id
+       FROM attendance_scans
+       WHERE attendance_session_id = $1`,
+      [r.attendance_session_id]
+    );
+
+    const scannedSet = new Set(scans.rows.map((s) => s.employee_id));
+
+    const rows = employees.rows.map((emp) => ({
+      employee_id: emp.employee_id,
+      name: `${emp.first_name} ${emp.last_name}`,
+      attended: scannedSet.has(emp.employee_id),
+    }));
+
+    return res.json({
+      report: r,
+      rows,
+    });
+  }
+
+  // TRAINING SESSION REPORT
+  const scans = await db.query(
+    `SELECT s.employee_id, s.scanned_at, e.first_name, e.last_name
+     FROM attendance_scans s
+     LEFT JOIN employees e ON e.employee_id = s.employee_id
+     WHERE s.attendance_session_id = $1
+     ORDER BY s.scanned_at`,
+    [r.attendance_session_id]
+  );
+
+  const rows = scans.rows.map((row) => ({
+    employee_id: row.employee_id,
+    name: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+    scanned_at: row.scanned_at,
+  }));
+
+  res.json({
+    report: r,
+    rows,
+  });
+};
