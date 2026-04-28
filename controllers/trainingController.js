@@ -87,8 +87,8 @@ exports.logScan = async (req, res) => {
   const scanned_by = Number(req.headers["employee_id"]) || employee_id;
 
   const result = await db.query(
-    `INSERT INTO attendance_scans (attendance_session_id, employee_id, scanned_by, source, scanned_at)
-     VALUES ($1, $2, $3, $4, NOW())
+    `INSERT INTO attendance_scans (attendance_session_id, employee_id, scanned_at, scanned_by, source)
+     VALUES ($1, $2, NOW(), $3, $4)
      RETURNING *`,
     [attendance_session_id, employee_id, scanned_by, source]
   );
