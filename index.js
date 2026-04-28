@@ -22,6 +22,9 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ⭐ STATIC FILE SERVING FOR DOCUMENTS (THIS FIXES YOUR 404)
+app.use("/api/data/documents", express.static(path.join(__dirname, "data/documents")));
+
 // ⭐ FILE SERVING FOR PERMANENT UPLOADS
 app.get("/files/:filename", (req, res) => {
   const filePath = path.join("/data/uploads", req.params.filename);
