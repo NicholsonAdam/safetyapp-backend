@@ -128,7 +128,7 @@ exports.getReportDetails = async (req, res) => {
   // PLANT MEETING REPORT
   if (r.type === "PLANT_MEETING") {
     const employees = await db.query(
-      `SELECT employee_id, first_name, last_name
+      `SELECT employee_id, name
        FROM employees
        ORDER BY employee_id`
     );
@@ -144,7 +144,7 @@ exports.getReportDetails = async (req, res) => {
 
     const rows = employees.rows.map((emp) => ({
       employee_id: emp.employee_id,
-      name: `${emp.first_name} ${emp.last_name}`,
+      name: emp.name,
       attended: scannedSet.has(emp.employee_id),
     }));
 
@@ -156,7 +156,7 @@ exports.getReportDetails = async (req, res) => {
 
   // TRAINING SESSION REPORT
   const scans = await db.query(
-    `SELECT s.employee_id, s.scanned_at, e.first_name, e.last_name
+    `SELECT s.employee_id, s.scanned_at, e.name
      FROM attendance_scans s
      LEFT JOIN employees e ON e.employee_id = s.employee_id
      WHERE s.attendance_session_id = $1
@@ -166,7 +166,7 @@ exports.getReportDetails = async (req, res) => {
 
   const rows = scans.rows.map((row) => ({
     employee_id: row.employee_id,
-    name: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+    name: row.name || "",
     scanned_at: row.scanned_at,
   }));
 
