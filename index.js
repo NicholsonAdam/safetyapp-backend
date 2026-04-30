@@ -70,6 +70,7 @@ app.use("/api/documents", documentsRoutes);
 app.use("/api/documentVersions", documentVersionsRoutes);
 app.use("/api/signatures", documentSignaturesRoutes);
 app.use("/api/training", trainingRoutes);
+app.use('/api/action-items', require('./routes/actionItems'));
 
 // ⭐ GENERIC /api ROUTES LAST
 app.use('/api', healthcheckRoute);
