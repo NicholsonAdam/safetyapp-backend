@@ -7,6 +7,22 @@ const pool = require("../config/db");
 // ===============================
 router.get("/", async (req, res) => {
   try {
+    const search = req.query.search || "";
+
+    // If search is provided → autocomplete mode
+    if (search.length > 0) {
+      const result = await pool.query(
+        `SELECT employee_id, name
+         FROM employees
+         WHERE name ILIKE $1 || '%'
+         ORDER BY name
+         LIMIT 20`,
+        [search]
+      );
+      return res.json(result.rows);
+    }
+
+    // Otherwise → return full list
     const result = await pool.query(
       "SELECT * FROM employees ORDER BY employee_id ASC"
     );
@@ -95,8 +111,8 @@ router.put("/:employee_id", async (req, res) => {
         leader_id,
         email,
         site_admin,
-        active,        // now correctly placed
-        employee_id,   // now correctly $9
+        active,
+        employee_id,
       ]
     );
 
