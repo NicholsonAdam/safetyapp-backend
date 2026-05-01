@@ -1,63 +1,87 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db'); // <-- YOUR DB FILE
+const db = require('../config/db');
 
-// Helper: get filtered action items
+// ---------------------------------------------
+// Helper: Build WHERE clause for multi-select filters
+// ---------------------------------------------
+function buildArrayFilter(column, values, params, queryParts) {
+  if (Array.isArray(values) && values.length > 0) {
+    const placeholders = values.map(v => {
+      params.push(v);
+      return `$${params.length}`;
+    });
+    queryParts.push(`(${column} IN (${placeholders.join(', ')}))`);
+  }
+}
+
+// ---------------------------------------------
+// GET FILTERED ACTION ITEMS
+// ---------------------------------------------
 async function getFilteredActionItems(filters = {}) {
   const {
-    status,
-    department,
-    classification,
-    search,
+    status = [],
+    department = [],
+    classification = [],
+    search = null,
     sort = 'id',
     direction = 'asc',
   } = filters;
 
-  let query = `
-    SELECT *
-    FROM action_items
-    WHERE 1=1
-  `;
+  let queryParts = [];
+  let params = [];
 
-  const params = [];
+  // Multi-select filters
+  buildArrayFilter("status", status, params, queryParts);
+  buildArrayFilter("department", department, params, queryParts);
+  buildArrayFilter("classification", classification, params, queryParts);
 
-  if (status) {
-    params.push(status);
-    query += ` AND status = $${params.length}`;
-  }
-
-  if (department) {
-    params.push(department);
-    query += ` AND department = $${params.length}`;
-  }
-
-  if (classification) {
-    params.push(classification);
-    query += ` AND classification = $${params.length}`;
-  }
-
+  // Search filter
   if (search) {
     params.push(`%${search}%`);
-    query += ` AND (description ILIKE $${params.length} OR notes ILIKE $${params.length})`;
+    queryParts.push(`(description ILIKE $${params.length} OR notes ILIKE $${params.length})`);
   }
 
-  const allowedSort = ['id', 'created_at', 'updated_at', 'status', 'department', 'classification', 'date_submitted', 'date_last_update'];
+  // Build WHERE clause
+  let whereClause = queryParts.length > 0
+    ? "WHERE " + queryParts.join(" AND ")
+    : "";
+
+  // Sorting
+  const allowedSort = [
+    'id',
+    'date_submitted',
+    'date_last_update',
+    'status',
+    'department',
+    'classification',
+    'submitted_by_user_id',
+    'current_owner_user_id'
+  ];
+
   const safeSort = allowedSort.includes(sort) ? sort : 'id';
   const safeDirection = direction === 'desc' ? 'desc' : 'asc';
 
-  query += ` ORDER BY ${safeSort} ${safeDirection}`;
+  const query = `
+    SELECT *
+    FROM action_items
+    ${whereClause}
+    ORDER BY ${safeSort} ${safeDirection};
+  `;
 
   const { rows } = await db.query(query, params);
   return rows;
 }
 
+// ---------------------------------------------
 // GET /api/action-items
+// ---------------------------------------------
 router.get('/', async (req, res) => {
   try {
     const filters = {
-      status: req.query.status || null,
-      department: req.query.department || null,
-      classification: req.query.classification || null,
+      status: req.query.status ? [].concat(req.query.status) : [],
+      department: req.query.department ? [].concat(req.query.department) : [],
+      classification: req.query.classification ? [].concat(req.query.classification) : [],
       search: req.query.search || null,
       sort: req.query.sort || 'id',
       direction: req.query.direction || 'asc',
@@ -71,7 +95,9 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ---------------------------------------------
 // PATCH /api/action-items/:id
+// ---------------------------------------------
 router.patch('/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -88,8 +114,8 @@ router.patch('/:id', async (req, res) => {
 
     const query = `
       UPDATE action_items
-      SET ${setClause}
-      , date_last_update = NOW()
+      SET ${setClause},
+          date_last_update = NOW()
       WHERE id = $${keys.length + 1}
       RETURNING *;
     `;
@@ -107,7 +133,9 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// ---------------------------------------------
 // CREATE NEW ACTION ITEM
+// ---------------------------------------------
 router.post('/', async (req, res) => {
   try {
     const {
@@ -120,10 +148,14 @@ router.post('/', async (req, res) => {
       notes,
     } = req.body;
 
+    // IMPORTANT:
+    // DO NOT INSERT date_submitted or date_last_update
+    // They are generated columns in Postgres.
+
     const query = `
       INSERT INTO action_items
-      (submitted_by_user_id, current_owner_user_id, description, department, classification, status, notes, date_submitted, date_last_update)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+      (submitted_by_user_id, current_owner_user_id, description, department, classification, status, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *;
     `;
 
@@ -146,15 +178,17 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ---------------------------------------------
 // EXPORT TO EXCEL
+// ---------------------------------------------
 router.get('/export/excel', async (req, res) => {
   try {
     const XLSX = require('xlsx');
 
     const filters = {
-      status: req.query.status || null,
-      department: req.query.department || null,
-      classification: req.query.classification || null,
+      status: req.query.status ? [].concat(req.query.status) : [],
+      department: req.query.department ? [].concat(req.query.department) : [],
+      classification: req.query.classification ? [].concat(req.query.classification) : [],
       search: req.query.search || null,
       sort: req.query.sort || 'id',
       direction: req.query.direction || 'asc',
