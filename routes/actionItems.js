@@ -11,6 +11,7 @@ async function getFilteredActionItems(filters = {}) {
     department = null,
     classification = null,
     owner = null,
+    element = null,
     search = null,
     sort = 'id',
     direction = 'asc',
@@ -24,7 +25,6 @@ async function getFilteredActionItems(filters = {}) {
 
   const params = [];
 
-  // Scalar filters
   if (status) {
     params.push(status);
     query += ` AND status = $${params.length}`;
@@ -45,12 +45,16 @@ async function getFilteredActionItems(filters = {}) {
     query += ` AND current_owner_user_id = $${params.length}`;
   }
 
+  if (element) {
+    params.push(element);
+    query += ` AND element = $${params.length}`;
+  }
+
   if (search) {
     params.push(`%${search}%`);
     query += ` AND (description ILIKE $${params.length} OR notes ILIKE $${params.length})`;
   }
 
-  // Sorting
   const allowedSort = [
     'id',
     'date_submitted',
@@ -59,7 +63,8 @@ async function getFilteredActionItems(filters = {}) {
     'department',
     'classification',
     'submitted_by_user_id',
-    'current_owner_user_id'
+    'current_owner_user_id',
+    'element' // <-- optional but recommended
   ];
 
   const safeSort = allowedSort.includes(sort) ? sort : 'id';
@@ -81,6 +86,7 @@ router.get('/', async (req, res) => {
       department: req.query.department || null,
       classification: req.query.classification || null,
       owner: req.query.owner || null,
+      element: req.query.element || null,
       search: req.query.search || null,
       sort: req.query.sort || 'id',
       direction: req.query.direction || 'asc',
@@ -132,7 +138,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // ---------------------------------------------
-// CREATE NEW ACTION ITEM
+// CREATE NEW ACTION ITEM  (UPDATED FOR ELEMENT)
 // ---------------------------------------------
 router.post('/', async (req, res) => {
   try {
@@ -144,12 +150,13 @@ router.post('/', async (req, res) => {
       classification,
       status,
       notes,
+      element,   // <-- NEW FIELD
     } = req.body;
 
     const query = `
       INSERT INTO action_items
-      (submitted_by_user_id, current_owner_user_id, description, department, classification, status, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (submitted_by_user_id, current_owner_user_id, description, department, classification, status, notes, element)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *;
     `;
 
@@ -161,6 +168,7 @@ router.post('/', async (req, res) => {
       classification,
       status,
       notes,
+      element,   // <-- NEW FIELD
     ];
 
     const { rows } = await db.query(query, params);
