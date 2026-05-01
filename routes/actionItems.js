@@ -3,49 +3,52 @@ const router = express.Router();
 const db = require('../config/db');
 
 // ---------------------------------------------
-// Helper: Build WHERE clause for multi-select filters
-// ---------------------------------------------
-function buildArrayFilter(column, values, params, queryParts) {
-  if (Array.isArray(values) && values.length > 0) {
-    const placeholders = values.map(v => {
-      params.push(v);
-      return `$${params.length}`;
-    });
-    queryParts.push(`(${column} IN (${placeholders.join(', ')}))`);
-  }
-}
-
-// ---------------------------------------------
-// GET FILTERED ACTION ITEMS
+// GET FILTERED ACTION ITEMS (scalar filters)
 // ---------------------------------------------
 async function getFilteredActionItems(filters = {}) {
   const {
-    status = [],
-    department = [],
-    classification = [],
+    status = null,
+    department = null,
+    classification = null,
+    owner = null,
     search = null,
     sort = 'id',
     direction = 'asc',
   } = filters;
 
-  let queryParts = [];
-  let params = [];
+  let query = `
+    SELECT *
+    FROM action_items
+    WHERE 1=1
+  `;
 
-  // Multi-select filters
-  buildArrayFilter("status", status, params, queryParts);
-  buildArrayFilter("department", department, params, queryParts);
-  buildArrayFilter("classification", classification, params, queryParts);
+  const params = [];
 
-  // Search filter
-  if (search) {
-    params.push(`%${search}%`);
-    queryParts.push(`(description ILIKE $${params.length} OR notes ILIKE $${params.length})`);
+  // Scalar filters
+  if (status) {
+    params.push(status);
+    query += ` AND status = $${params.length}`;
   }
 
-  // Build WHERE clause
-  let whereClause = queryParts.length > 0
-    ? "WHERE " + queryParts.join(" AND ")
-    : "";
+  if (department) {
+    params.push(department);
+    query += ` AND department = $${params.length}`;
+  }
+
+  if (classification) {
+    params.push(classification);
+    query += ` AND classification = $${params.length}`;
+  }
+
+  if (owner) {
+    params.push(owner);
+    query += ` AND current_owner_user_id = $${params.length}`;
+  }
+
+  if (search) {
+    params.push(`%${search}%`);
+    query += ` AND (description ILIKE $${params.length} OR notes ILIKE $${params.length})`;
+  }
 
   // Sorting
   const allowedSort = [
@@ -62,12 +65,7 @@ async function getFilteredActionItems(filters = {}) {
   const safeSort = allowedSort.includes(sort) ? sort : 'id';
   const safeDirection = direction === 'desc' ? 'desc' : 'asc';
 
-  const query = `
-    SELECT *
-    FROM action_items
-    ${whereClause}
-    ORDER BY ${safeSort} ${safeDirection};
-  `;
+  query += ` ORDER BY ${safeSort} ${safeDirection}`;
 
   const { rows } = await db.query(query, params);
   return rows;
@@ -79,9 +77,10 @@ async function getFilteredActionItems(filters = {}) {
 router.get('/', async (req, res) => {
   try {
     const filters = {
-      status: req.query.status ? [].concat(req.query.status) : [],
-      department: req.query.department ? [].concat(req.query.department) : [],
-      classification: req.query.classification ? [].concat(req.query.classification) : [],
+      status: req.query.status || null,
+      department: req.query.department || null,
+      classification: req.query.classification || null,
+      owner: req.query.owner || null,
       search: req.query.search || null,
       sort: req.query.sort || 'id',
       direction: req.query.direction || 'asc',
@@ -114,8 +113,7 @@ router.patch('/:id', async (req, res) => {
 
     const query = `
       UPDATE action_items
-      SET ${setClause},
-          date_last_update = NOW()
+      SET ${setClause}
       WHERE id = $${keys.length + 1}
       RETURNING *;
     `;
@@ -147,10 +145,6 @@ router.post('/', async (req, res) => {
       status,
       notes,
     } = req.body;
-
-    // IMPORTANT:
-    // DO NOT INSERT date_submitted or date_last_update
-    // They are generated columns in Postgres.
 
     const query = `
       INSERT INTO action_items
@@ -186,9 +180,10 @@ router.get('/export/excel', async (req, res) => {
     const XLSX = require('xlsx');
 
     const filters = {
-      status: req.query.status ? [].concat(req.query.status) : [],
-      department: req.query.department ? [].concat(req.query.department) : [],
-      classification: req.query.classification ? [].concat(req.query.classification) : [],
+      status: req.query.status || null,
+      department: req.query.department || null,
+      classification: req.query.classification || null,
+      owner: req.query.owner || null,
       search: req.query.search || null,
       sort: req.query.sort || 'id',
       direction: req.query.direction || 'asc',
