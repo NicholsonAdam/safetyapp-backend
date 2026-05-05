@@ -6,24 +6,24 @@ const router = express.Router();
 const documentSignatureRequirementController = require('../controllers/documentSignatureRequirementsController');
 
 // Assign signature requirements
-router.post('/', documentSignatureRequirementsController.assignRequirements);
+router.post('/', documentSignatureRequirementController.assignRequirements);
 
 // Get requirements for a document version
 router.get(
   '/document/:documentId/version/:versionId',
-  documentSignatureRequirementsController.getRequirementsForDocumentVersion
+  documentSignatureRequirementController.getRequirementsForDocumentVersion
 );
 
 // Get requirements for a specific employee
 router.get(
   '/employee/:employeeId',
-  documentSignatureRequirementsController.getRequirementsForEmployee
+  documentSignatureRequirementController.getRequirementsForEmployee
 );
 
 // Leader dashboard for a document version
 router.get(
   '/dashboard/:documentId/:versionId',
-  documentSignatureRequirementsController.getDashboardForDocumentVersion
+  documentSignatureRequirementController.getDashboardForDocumentVersion
 );
 
 module.exports = router;
