@@ -6,23 +6,28 @@ const router = express.Router();
 const documentSignatureRequirementService = require('../services/documentSignatureRequirementService');
 const db = require('../config/db');
 
-// Safe recursive folder lookup
-async function getAllSubfolderIds(parentId) {
+// 🔥 Correct recursive folder lookup using PostgreSQL CTE
+async function getAllSubfolderIds(rootId) {
   try {
     const result = await db.query(
-      `SELECT id FROM document_folders WHERE parent_id = $1`,
-      [parentId]
+      `
+      WITH RECURSIVE subfolders AS (
+        SELECT id
+        FROM document_folders
+        WHERE id = $1
+
+        UNION ALL
+
+        SELECT df.id
+        FROM document_folders df
+        INNER JOIN subfolders sf ON df.parent_folder_id = sf.id
+      )
+      SELECT id FROM subfolders;
+      `,
+      [rootId]
     );
 
-    const ids = result.rows.map(r => r.id);
-    let all = [...ids];
-
-    for (const id of ids) {
-      const children = await getAllSubfolderIds(id);
-      all = [...all, ...children];
-    }
-
-    return all;
+    return result.rows.map(r => r.id);
   } catch (err) {
     console.error("Folder recursion error:", err);
     return [];
@@ -34,8 +39,7 @@ router.get('/:employeeId', async (req, res) => {
     const { employeeId } = req.params;
 
     // 1. Get ALL subfolders under Public Access (folder_id = 15)
-    const subfolders = await getAllSubfolderIds(15);
-    const folderIds = [15, ...subfolders];
+    const folderIds = await getAllSubfolderIds(15); // already includes 15
 
     // 2. Fetch all documents in ANY of those folders
     const { rows: docs } = await db.query(
