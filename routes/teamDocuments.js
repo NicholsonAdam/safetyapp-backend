@@ -3,8 +3,8 @@
 const express = require('express');
 const router = express.Router();
 
-const documents = require('../models/documents');
-const documentVersions = require('../models/documentVersions');
+const documents = require('../routes/documents');
+const documentVersions = require('../routes/documentVersions');
 const documentSignatureRequirementService = require('../services/documentSignatureRequirementService');
 const documentSignatureService = require('../services/documentSignatureService');
 
