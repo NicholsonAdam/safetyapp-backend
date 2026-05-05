@@ -45,6 +45,8 @@ const documentVersionsRoutes = require("./routes/documentVersions");
 const trainingRoutes = require("./routes/training");
 const documentSignaturesRoutes = require("./routes/documentSignatures");
 const safetyQuizRoutes = require('./routes/safetyQuizRoutes');
+const teamDocumentsRoutes = require("./routes/teamDocuments");
+const documentSignatureRequirementsRoutes = require("./routes/documentSignatureRequirements");
 
 // ⭐ LOAD MONTHLY ROLLOVER CRON JOB
 require('./cron/submissionRequirementsCron');
@@ -69,7 +71,11 @@ app.use('/api/submission-requirements', require('./routes/submissionRequirements
 app.use("/api/folders", documentFoldersRoutes);
 app.use("/api/documents", documentsRoutes);
 app.use("/api/documentVersions", documentVersionsRoutes);
+app.use("/api/signatures", require("./routes/signatureUpload"));
+app.use("/api/signatures", require("./routes/signatureHistory"));
 app.use("/api/signatures", documentSignaturesRoutes);
+app.use("/api/document-signature-requirements", documentSignatureRequirementsRoutes);
+app.use("/api/team/documents", teamDocumentsRoutes);
 app.use("/api/training", trainingRoutes);
 app.use('/api/action-items', require('./routes/actionItems'));
 app.use('/api/safety-quiz', safetyQuizRoutes);
