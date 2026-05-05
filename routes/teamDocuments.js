@@ -3,24 +3,46 @@
 const express = require('express');
 const router = express.Router();
 
-const documentService = require('../services/documentService');
-const versionService = require('../services/versionService');
 const documentSignatureRequirementService = require('../services/documentSignatureRequirementService');
-const documentSignatureService = require('../services/documentSignatureService');
 const db = require('../config/db');
+
+// Helper: recursively get all subfolder IDs under a parent folder
+async function getAllSubfolderIds(parentId) {
+  const result = await db.query(
+    `SELECT id FROM document_folders WHERE parent_id = $1`,
+    [parentId]
+  );
+
+  const ids = result.rows.map(r => r.id);
+  let all = [...ids];
+
+  for (const id of ids) {
+    const children = await getAllSubfolderIds(id);
+    all = [...all, ...children];
+  }
+
+  return all;
+}
 
 // GET /api/team/documents/:employeeId
 router.get('/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
 
-    // 1. Fetch all documents in Public Access (folder_id = 15)
-    const { rows: publicDocuments } = await documentService.getDocumentsByFolder(15);
+    // 1. Get ALL subfolders under Public Access (folder_id = 15)
+    const subfolders = await getAllSubfolderIds(15);
+    const folderIds = [15, ...subfolders];
+
+    // 2. Fetch all documents in ANY of those folders
+    const { rows: docs } = await db.query(
+      `SELECT * FROM documents WHERE folder_id = ANY($1)`,
+      [folderIds]
+    );
 
     const results = [];
 
-    for (const doc of publicDocuments) {
-      // 2. Get latest version for this document
+    for (const doc of docs) {
+      // 3. Get ONLY the latest version
       const { rows: versions } = await db.query(
         `SELECT *
          FROM document_versions
@@ -33,7 +55,7 @@ router.get('/:employeeId', async (req, res) => {
       const latestVersion = versions[0];
       if (!latestVersion) continue;
 
-      // 3. Check if this employee is required to sign
+      // 4. Check if this employee is required to sign
       const requirement =
         await documentSignatureRequirementService.getRequirementForEmployeeAndDocumentVersion(
           doc.id,
@@ -44,24 +66,23 @@ router.get('/:employeeId', async (req, res) => {
       let requiresSignature = false;
 
       if (requirement) {
-        // 4. Check if employee already signed
-        const { rows: signatureRows } =
-          await db.query(
-            `SELECT *
-             FROM document_signatures
-             WHERE document_id = $1
-               AND document_version_id = $2
-               AND employee_id = $3
-             LIMIT 1`,
-            [doc.id, latestVersion.document_version_id, employeeId]
-          );
+        // 5. Check if employee already signed
+        const { rows: signatureRows } = await db.query(
+          `SELECT *
+           FROM document_signatures
+           WHERE document_id = $1
+             AND document_version_id = $2
+             AND employee_id = $3
+           LIMIT 1`,
+          [doc.id, latestVersion.document_version_id, employeeId]
+        );
 
-        const signature = signatureRows[0];
-        requiresSignature = !signature;
+        requiresSignature = !signatureRows[0];
       }
 
       results.push({
         document_id: doc.id,
+        document_version_id: latestVersion.document_version_id,
         title: doc.title,
         requiresSignature
       });
