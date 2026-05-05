@@ -89,6 +89,7 @@ router.get('/:employeeId', async (req, res) => {
         document_version_id: latestVersion.document_version_id,
         version_number: latestVersion.version_number,
         title: doc.title,
+        file_path: latestVersion.file_path,
         requiresSignature
       });
     }
