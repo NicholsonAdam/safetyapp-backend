@@ -6,7 +6,7 @@ const router = express.Router();
 const documents = require('./documents');
 const documentVersions = require('./documentVersions');
 const documentSignatureRequirementService = require('../services/documentSignatureRequirementService');
-const documentSignatureService = require('../services/documentSignatureService');
+const documentSignatureService = require('../services/documentSignaturesService');
 
 // GET /api/team/documents/:employeeId
 router.get('/:employeeId', async (req, res) => {
