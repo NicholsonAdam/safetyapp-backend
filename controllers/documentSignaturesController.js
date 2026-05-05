@@ -1,4 +1,4 @@
-const service = require("../services/documentSignaturesService");
+const service = require("../services/documentSignatureService");
 
 exports.getSignatures = async (req, res) => {
   const result = await service.getSignatures(req.params.versionId);

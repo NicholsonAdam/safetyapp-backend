@@ -1,7 +1,7 @@
 // documentSignatureRequirementService.js
 
 const DocumentSignatureRequirements = require('../models/documentSignatureRequirements');
-const DocumentSignatures = require('./documentSignaturesService'); // REQUIRED FIX
+const DocumentSignatures = require('./documentSignatureService'); // REQUIRED FIX
 
 const documentSignatureRequirementService = {
   async assignRequirementsToEmployees({ documentId, documentVersionId, employeeIds, assignedBy }) {
