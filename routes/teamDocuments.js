@@ -6,25 +6,29 @@ const router = express.Router();
 const documentSignatureRequirementService = require('../services/documentSignatureRequirementService');
 const db = require('../config/db');
 
-// Helper: recursively get all subfolder IDs under a parent folder
+// Safe recursive folder lookup
 async function getAllSubfolderIds(parentId) {
-  const result = await db.query(
-    `SELECT id FROM document_folders WHERE parent_id = $1`,
-    [parentId]
-  );
+  try {
+    const result = await db.query(
+      `SELECT id FROM document_folders WHERE parent_id = $1`,
+      [parentId]
+    );
 
-  const ids = result.rows.map(r => r.id);
-  let all = [...ids];
+    const ids = result.rows.map(r => r.id);
+    let all = [...ids];
 
-  for (const id of ids) {
-    const children = await getAllSubfolderIds(id);
-    all = [...all, ...children];
+    for (const id of ids) {
+      const children = await getAllSubfolderIds(id);
+      all = [...all, ...children];
+    }
+
+    return all;
+  } catch (err) {
+    console.error("Folder recursion error:", err);
+    return []; // fail safe
   }
-
-  return all;
 }
 
-// GET /api/team/documents/:employeeId
 router.get('/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -66,7 +70,6 @@ router.get('/:employeeId', async (req, res) => {
       let requiresSignature = false;
 
       if (requirement) {
-        // 5. Check if employee already signed
         const { rows: signatureRows } = await db.query(
           `SELECT *
            FROM document_signatures
@@ -91,7 +94,7 @@ router.get('/:employeeId', async (req, res) => {
     return res.json(results);
   } catch (error) {
     console.error('Error fetching team documents:', error);
-    return res.status(500).json({ message: 'Failed to fetch team documents.' });
+    return res.json([]); // fail safe so frontend never crashes
   }
 });
 
