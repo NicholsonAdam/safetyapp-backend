@@ -25,7 +25,7 @@ async function getAllSubfolderIds(parentId) {
     return all;
   } catch (err) {
     console.error("Folder recursion error:", err);
-    return []; // fail safe
+    return [];
   }
 }
 
@@ -83,18 +83,28 @@ router.get('/:employeeId', async (req, res) => {
         requiresSignature = !signatureRows[0];
       }
 
+      // 5. Push ONLY the latest version
       results.push({
         document_id: doc.id,
         document_version_id: latestVersion.document_version_id,
+        version_number: latestVersion.version_number,
         title: doc.title,
         requiresSignature
       });
     }
 
-    return res.json(results);
+    // 6. Deduplicate by document_id (just in case)
+    const unique = Object.values(
+      results.reduce((acc, item) => {
+        acc[item.document_id] = item;
+        return acc;
+      }, {})
+    );
+
+    return res.json(unique);
   } catch (error) {
     console.error('Error fetching team documents:', error);
-    return res.json([]); // fail safe so frontend never crashes
+    return res.json([]);
   }
 });
 
