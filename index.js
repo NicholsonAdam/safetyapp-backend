@@ -44,6 +44,7 @@ const documentsRoutes = require("./routes/documents");
 const documentVersionsRoutes = require("./routes/documentVersions");
 const trainingRoutes = require("./routes/training");
 const documentSignaturesRoutes = require("./routes/documentSignatures");
+const safetyQuizRoutes = require('./routes/safetyQuizRoutes');
 
 // ⭐ LOAD MONTHLY ROLLOVER CRON JOB
 require('./cron/submissionRequirementsCron');
@@ -71,6 +72,7 @@ app.use("/api/documentVersions", documentVersionsRoutes);
 app.use("/api/signatures", documentSignaturesRoutes);
 app.use("/api/training", trainingRoutes);
 app.use('/api/action-items', require('./routes/actionItems'));
+app.use('/api/safety-quiz', safetyQuizRoutes);
 
 // ⭐ GENERIC /api ROUTES LAST
 app.use('/api', healthcheckRoute);
