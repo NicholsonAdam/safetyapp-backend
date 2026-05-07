@@ -17,8 +17,10 @@ router.get("/history/:employeeId", async (req, res) => {
          dv.version_number,
          d.title
        FROM document_signatures ds
-       JOIN document_versions dv ON dv.document_version_id = ds.document_version_id
-       JOIN documents d ON d.document_id = ds.document_id
+       JOIN document_versions dv 
+         ON dv.id = ds.document_version_id
+       JOIN documents d 
+         ON d.id = ds.document_id
        WHERE ds.employee_id = $1
        ORDER BY ds.signed_at DESC`,
       [employeeId]
