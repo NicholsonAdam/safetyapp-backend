@@ -90,7 +90,7 @@ app.use("/api/data/documents", express.static("/data/documents"));
 
 // ⭐ STATIC FILE SERVING FOR UPLOADS (FIXED)
 app.use("/uploads", express.static("/data/uploads"));
-
+app.use("/data/uploads", express.static("/data/uploads"));
 app.use("/huddles/pdf", express.static(path.join(__dirname, "huddles/pdf")));
 
 // ERROR HANDLER
