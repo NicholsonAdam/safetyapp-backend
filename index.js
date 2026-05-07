@@ -79,6 +79,7 @@ app.use("/api/team/documents", teamDocumentsRoutes);
 app.use("/api/training", trainingRoutes);
 app.use('/api/action-items', require('./routes/actionItems'));
 app.use('/api/safety-quiz', safetyQuizRoutes);
+app.use("/leader/signatures", require("./routes/leaderSignatures"));
 
 // ⭐ GENERIC /api ROUTES LAST
 app.use('/api', healthcheckRoute);
