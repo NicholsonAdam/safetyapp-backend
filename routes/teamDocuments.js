@@ -67,7 +67,7 @@ router.get('/:employeeId', async (req, res) => {
       const requirement =
         await documentSignatureRequirementService.getRequirementForEmployeeAndDocumentVersion(
           doc.id,
-          latestVersion.document_version_id,
+          latestVersion.id,
           employeeId
         );
 
@@ -81,7 +81,7 @@ router.get('/:employeeId', async (req, res) => {
              AND document_version_id = $2
              AND employee_id = $3
            LIMIT 1`,
-          [doc.id, latestVersion.document_version_id, employeeId]
+          [doc.id, latestVersion.id, employeeId]
         );
 
         requiresSignature = !signatureRows[0];
@@ -90,7 +90,7 @@ router.get('/:employeeId', async (req, res) => {
       // 5. Push ONLY the latest version
       results.push({
         document_id: doc.id,
-        document_version_id: latestVersion.document_version_id,
+        document_version_id: latestVersion.id,
         version_number: latestVersion.version_number,
         title: doc.title,
         file_path: latestVersion.file_path,
