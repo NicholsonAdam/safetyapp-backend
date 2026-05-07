@@ -8,7 +8,7 @@ router.get("/history/:employeeId", async (req, res) => {
   try {
     const result = await db.query(
       `SELECT 
-         ds.signature_id,
+         ds.id AS signature_id,
          ds.document_id,
          ds.document_version_id,
          ds.employee_id,
