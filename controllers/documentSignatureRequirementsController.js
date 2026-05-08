@@ -8,24 +8,54 @@ const documentSignatureRequirementController = {
   // POST /api/document-signature-requirements
   async assignRequirements(req, res) {
     try {
-      const { documentId, documentVersionId, employeeIds } = req.body;
-      const assignedBy = req.user?.id || req.user?.employee_id || 'system'; // adjust to your auth shape
+      console.log("RAW REQ BODY:", req.body);
 
-      if (!documentId || !documentVersionId || !Array.isArray(employeeIds) || employeeIds.length === 0) {
-        return res.status(400).json({ message: 'documentId, documentVersionId, and non-empty employeeIds are required.' });
-      }
-
-      const created = await documentSignatureRequirementService.assignRequirementsToEmployees({
+      const {
         documentId,
         documentVersionId,
         employeeIds,
-        assignedBy
-      });
+        employee_ids,
+        selectedEmployees,
+        selectedEmployeeIds
+      } = req.body;
+
+      // Normalize all possible frontend field names
+      const finalEmployeeIds =
+        employeeIds ||
+        employee_ids ||
+        selectedEmployees ||
+        selectedEmployeeIds;
+
+      console.log("FINAL EMPLOYEE IDS:", finalEmployeeIds);
+
+      const assignedBy = req.user?.id || req.user?.employee_id || 'system';
+
+      if (
+        !documentId ||
+        !documentVersionId ||
+        !Array.isArray(finalEmployeeIds) ||
+        finalEmployeeIds.length === 0
+      ) {
+        return res.status(400).json({
+          message:
+            'documentId, documentVersionId, and non-empty employeeIds are required.'
+        });
+      }
+
+      const created =
+        await documentSignatureRequirementService.assignRequirementsToEmployees({
+          documentId,
+          documentVersionId,
+          employeeIds: finalEmployeeIds,
+          assignedBy
+        });
 
       return res.status(201).json(created);
     } catch (error) {
       console.error('Error assigning document signature requirements:', error);
-      return res.status(500).json({ message: 'Failed to assign document signature requirements.' });
+      return res
+        .status(500)
+        .json({ message: 'Failed to assign document signature requirements.' });
     }
   },
 
@@ -34,15 +64,18 @@ const documentSignatureRequirementController = {
     try {
       const { documentId, versionId } = req.params;
 
-      const requirements = await documentSignatureRequirementService.getRequirementsForDocumentVersion(
-        documentId,
-        versionId
-      );
+      const requirements =
+        await documentSignatureRequirementService.getRequirementsForDocumentVersion(
+          documentId,
+          versionId
+        );
 
       return res.json(requirements);
     } catch (error) {
       console.error('Error fetching document signature requirements:', error);
-      return res.status(500).json({ message: 'Failed to fetch document signature requirements.' });
+      return res
+        .status(500)
+        .json({ message: 'Failed to fetch document signature requirements.' });
     }
   },
 
@@ -51,12 +84,17 @@ const documentSignatureRequirementController = {
     try {
       const { employeeId } = req.params;
 
-      const requirements = await documentSignatureRequirementService.getRequirementsForEmployee(employeeId);
+      const requirements =
+        await documentSignatureRequirementService.getRequirementsForEmployee(
+          employeeId
+        );
 
       return res.json(requirements);
     } catch (error) {
       console.error('Error fetching employee document signature requirements:', error);
-      return res.status(500).json({ message: 'Failed to fetch employee document signature requirements.' });
+      return res
+        .status(500)
+        .json({ message: 'Failed to fetch employee document signature requirements.' });
     }
   },
 
@@ -66,16 +104,18 @@ const documentSignatureRequirementController = {
       const { documentId, versionId } = req.params;
 
       // 1. Get all requirements for this version
-      const requirements = await documentSignatureRequirementService.getRequirementsForDocumentVersion(
-        documentId,
-        versionId
-      );
+      const requirements =
+        await documentSignatureRequirementService.getRequirementsForDocumentVersion(
+          documentId,
+          versionId
+        );
 
       // 2. Get all signatures for this version
-      const signatures = await documentSignatureService.getSignaturesForDocumentVersion(
-        documentId,
-        versionId
-      );
+      const signatures =
+        await documentSignatureService.getSignaturesForDocumentVersion(
+          documentId,
+          versionId
+        );
 
       // 3. Get employee details
       const employeeIds = requirements.map(r => r.employee_id);
@@ -90,8 +130,12 @@ const documentSignatureRequirementController = {
       // 4. Build dashboard lists
       const signedEmployeeIds = signatures.map(s => s.employee_id);
 
-      const signed = employees.filter(e => signedEmployeeIds.includes(e.employee_id));
-      const missing = employees.filter(e => !signedEmployeeIds.includes(e.employee_id));
+      const signed = employees.filter(e =>
+        signedEmployeeIds.includes(e.employee_id)
+      );
+      const missing = employees.filter(
+        e => !signedEmployeeIds.includes(e.employee_id)
+      );
 
       return res.json({
         documentId,
@@ -104,7 +148,9 @@ const documentSignatureRequirementController = {
       });
     } catch (error) {
       console.error('Error building signature dashboard:', error);
-      return res.status(500).json({ message: 'Failed to build signature dashboard.' });
+      return res
+        .status(500)
+        .json({ message: 'Failed to build signature dashboard.' });
     }
   }
 };
