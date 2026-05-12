@@ -76,9 +76,9 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     stream.on("finish", async () => {
 
         // ⭐ Insert Rack Inspection PDF into Document Library
-        const db = require("../../db");
+        const pool = require("../../config/db");
 
-        const docResult = await db.query(
+        const docResult = await pool.query(
             `INSERT INTO documents (folder_id, name, created_by)
             VALUES ($1, $2, $3)
             RETURNING id`,
@@ -91,7 +91,7 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
 
         const documentId = docResult.rows[0].id;
 
-        await db.query(
+        await pool.query(
             `INSERT INTO document_versions (document_id, version_number, file_path, uploaded_by)
             VALUES ($1, $2, $3, $4)`,
             [
