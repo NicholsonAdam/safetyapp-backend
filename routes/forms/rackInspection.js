@@ -25,8 +25,17 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
       ...fields
     } = req.body;
 
+    // ⭐ Pull employee_id from headers (REAL FK)
+    const employeeId = req.headers["employee_id"];
+
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing employee_id header."
+      });
+    }
+
     // ⭐ Photo saved to persistent disk automatically:
-    // /data/uploads/<unique>.jpg
     const photoPath = req.file ? req.file.path : null;
 
     // ⭐ PDF path on persistent disk
@@ -76,7 +85,6 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     // ─── When PDF is finished writing ─────────────────────────────
     stream.on("finish", async () => {
 
-      // ⭐ Insert Rack Inspection PDF into Document Library
       const pool = require("../../config/db");
 
       // 1️⃣ Insert into documents table
@@ -88,7 +96,7 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
           19, // Rack Inspections folder
           `Rack Inspection - ${rackId}`,
           notes || "",
-          submitter
+          employeeId   // ⭐ MUST be a valid FK
         ]
       );
 
@@ -103,7 +111,7 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
           1,
           pdfPath,
           "application/pdf",
-          submitter,
+          employeeId,   // ⭐ MUST be a valid FK
           "Initial upload"
         ]
       );

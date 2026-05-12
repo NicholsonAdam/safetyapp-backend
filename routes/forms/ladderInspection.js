@@ -25,6 +25,16 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
       ...fields
     } = req.body;
 
+    // ⭐ Pull employee_id from headers (REAL FK)
+    const employeeId = req.headers["employee_id"];
+
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing employee_id header."
+      });
+    }
+
     const photoPath = req.file ? req.file.path : null;
 
     const pdfPath = path.join(
@@ -72,7 +82,6 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     // ─── When PDF is finished writing ─────────────────────────────
     stream.on("finish", async () => {
 
-      // ⭐ Insert Ladder Inspection PDF into Document Library
       const pool = require("../../config/db");
 
       // 1️⃣ Insert into documents table
@@ -84,7 +93,7 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
           20, // Ladder Inspections folder
           `Ladder Inspection - ${ladderId}`,
           notes || "",
-          submitter
+          employeeId   // ⭐ MUST be a valid FK
         ]
       );
 
@@ -99,7 +108,7 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
           1,
           pdfPath,
           "application/pdf",
-          submitter,
+          employeeId,   // ⭐ MUST be a valid FK
           "Initial upload"
         ]
       );
