@@ -69,41 +69,48 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
 
     doc.end();
 
+    // ─── When PDF is finished writing ─────────────────────────────
     stream.on("finish", async () => {
 
-        // ⭐ Insert Housekeeping Inspection PDF into Document Library
-        const pool = require("../../config/db");
+      // ⭐ Insert Housekeeping Inspection PDF into Document Library
+      const pool = require("../../config/db");
 
-        const docResult = await pool.query(
-            `INSERT INTO documents (folder_id, name, created_by)
-            VALUES ($1, $2, $3)
-            RETURNING id`,
-            [
-            21, // Housekeeping Inspections folder
-            `Housekeeping Inspection - ${area} - ${new Date().toLocaleDateString()}`,
-            submitter
-            ]
-        );
+      // 1️⃣ Insert into documents table
+      const docResult = await pool.query(
+        `INSERT INTO documents (folder_id, title, description, created_by, created_at, is_active)
+         VALUES ($1, $2, $3, $4, NOW(), true)
+         RETURNING id`,
+        [
+          21, // Housekeeping Inspections folder
+          `Housekeeping Inspection - ${area}`,
+          notes || "",
+          submitter
+        ]
+      );
 
-        const documentId = docResult.rows[0].id;
+      const documentId = docResult.rows[0].id;
 
-        await pool.query(
-            `INSERT INTO document_versions (document_id, version_number, file_path, uploaded_by)
-            VALUES ($1, $2, $3, $4)`,
-            [
-            documentId,
-            1,
-            pdfPath,
-            submitter
-            ]
-        );
+      // 2️⃣ Insert into document_versions table
+      await pool.query(
+        `INSERT INTO document_versions (document_id, version_number, file_path, file_type, uploaded_by, uploaded_at, change_comment)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6)`,
+        [
+          documentId,
+          1,
+          pdfPath,
+          "application/pdf",
+          submitter,
+          "Initial upload"
+        ]
+      );
 
-        return res.json({
-            success: true,
-            message: "Housekeeping inspection submitted.",
-            pdfPath,
-            photoPath,
-        });
+      // ⭐ Final response
+      return res.json({
+        success: true,
+        message: "Housekeeping inspection submitted.",
+        pdfPath,
+        photoPath,
+      });
     });
 
   } catch (err) {
