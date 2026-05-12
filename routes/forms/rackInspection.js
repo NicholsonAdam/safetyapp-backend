@@ -1,27 +1,22 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const PDFDocument = require("pdfkit");
 
-// ─── Multer storage ───────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "../../uploads/rack-inspection");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `rack_${Date.now()}${ext}`);
-  },
-});
+// ⭐ USE YOUR EXISTING GLOBAL UPLOAD MIDDLEWARE
+const { uploadPhotos } = require("../../middleware/upload");
 
-const upload = multer({ storage });
+// ⭐ PERSISTENT DISK PATHS
+const PDF_DIR = "/data/documents/rack-inspection";
+
+// Ensure PDF directory exists
+if (!fs.existsSync(PDF_DIR)) {
+  fs.mkdirSync(PDF_DIR, { recursive: true });
+}
 
 // ─── POST /api/forms/rack-inspection ───────────────────────────────
-router.post("/", upload.single("photo"), async (req, res) => {
+router.post("/", uploadPhotos.single("photo"), async (req, res) => {
   try {
     const {
       rackId,
@@ -30,17 +25,17 @@ router.post("/", upload.single("photo"), async (req, res) => {
       ...fields
     } = req.body;
 
+    // ⭐ Photo saved to persistent disk automatically:
+    // /data/uploads/<unique>.jpg
     const photoPath = req.file ? req.file.path : null;
 
-    // ─── Generate PDF ─────────────────────────────────────────────
-    const pdfDir = path.join(__dirname, "../../documents/Rack Inspection");
-    if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
-
+    // ⭐ PDF path on persistent disk
     const pdfPath = path.join(
-      pdfDir,
+      PDF_DIR,
       `RackInspection_${rackId}_${Date.now()}.pdf`
     );
 
+    // ─── Generate PDF ─────────────────────────────────────────────
     const doc = new PDFDocument();
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
@@ -64,6 +59,7 @@ router.post("/", upload.single("photo"), async (req, res) => {
     doc.fontSize(14).text("Notes", { underline: true });
     doc.fontSize(12).text(notes || "None");
 
+    // ⭐ Add photo page if uploaded
     if (photoPath) {
       doc.addPage();
       doc.fontSize(16).text("Attached Photo");
@@ -82,7 +78,7 @@ router.post("/", upload.single("photo"), async (req, res) => {
         success: true,
         message: "Rack inspection submitted.",
         pdfPath,
-        photoPath,
+        photoPath,   // ⭐ Both paths now point to /data
       });
     });
 
