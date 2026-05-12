@@ -4,35 +4,32 @@ const path = require("path");
 const fs = require("fs");
 const PDFDocument = require("pdfkit");
 
-// ⭐ USE YOUR EXISTING GLOBAL UPLOAD MIDDLEWARE
+// ⭐ Use your existing upload middleware
 const { uploadPhotos } = require("../../middleware/upload");
 
-// ⭐ PERSISTENT DISK PATHS
-const PDF_DIR = "/data/documents/rack-inspection";
+// ⭐ Persistent disk path for PDFs
+const PDF_DIR = "/data/documents/ladder-inspection";
 
-// Ensure PDF directory exists
+// Ensure directory exists
 if (!fs.existsSync(PDF_DIR)) {
   fs.mkdirSync(PDF_DIR, { recursive: true });
 }
 
-// ─── POST /api/forms/rack-inspection ───────────────────────────────
+// ─── POST /api/forms/ladder-inspection ───────────────────────────────
 router.post("/", uploadPhotos.single("photo"), async (req, res) => {
   try {
     const {
-      rackId,
+      ladderId,
       notes,
       submitter,
       ...fields
     } = req.body;
 
-    // ⭐ Photo saved to persistent disk automatically:
-    // /data/uploads/<unique>.jpg
     const photoPath = req.file ? req.file.path : null;
 
-    // ⭐ PDF path on persistent disk
     const pdfPath = path.join(
       PDF_DIR,
-      `RackInspection_${rackId}_${Date.now()}.pdf`
+      `LadderInspection_${ladderId}_${Date.now()}.pdf`
     );
 
     // ─── Generate PDF ─────────────────────────────────────────────
@@ -40,10 +37,10 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    doc.fontSize(20).text("Rack Inspection Report", { underline: true });
+    doc.fontSize(20).text("Ladder Inspection Report", { underline: true });
     doc.moveDown();
 
-    doc.fontSize(12).text(`Rack ID: ${rackId}`);
+    doc.fontSize(12).text(`Ladder ID: ${ladderId}`);
     doc.text(`Submitter: ${submitter}`);
     doc.text(`Date: ${new Date().toLocaleString()}`);
     doc.moveDown();
@@ -59,7 +56,6 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     doc.fontSize(14).text("Notes", { underline: true });
     doc.fontSize(12).text(notes || "None");
 
-    // ⭐ Add photo page if uploaded
     if (photoPath) {
       doc.addPage();
       doc.fontSize(16).text("Attached Photo");
@@ -75,7 +71,7 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
 
     stream.on("finish", async () => {
 
-        // ⭐ Insert Rack Inspection PDF into Document Library
+        // ⭐ Insert Ladder Inspection PDF into Document Library
         const db = require("../../db");
 
         const docResult = await db.query(
@@ -83,8 +79,8 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
             VALUES ($1, $2, $3)
             RETURNING id`,
             [
-            19, // Rack Inspections folder
-            `Rack Inspection - ${rackId} - ${new Date().toLocaleDateString()}`,
+            20, // Ladder Inspections folder
+            `Ladder Inspection - ${ladderId} - ${new Date().toLocaleDateString()}`,
             submitter
             ]
         );
@@ -104,14 +100,14 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
 
         return res.json({
             success: true,
-            message: "Rack inspection submitted.",
+            message: "Ladder inspection submitted.",
             pdfPath,
             photoPath,
         });
-     });
+    });
 
   } catch (err) {
-    console.error("Rack Inspection Error:", err);
+    console.error("Ladder Inspection Error:", err);
     res.status(500).json({ success: false, error: "Server error." });
   }
 });

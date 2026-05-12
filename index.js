@@ -81,6 +81,8 @@ app.use('/api/action-items', require('./routes/actionItems'));
 app.use('/api/safety-quiz', safetyQuizRoutes);
 app.use("/api/leader/signatures", require("./routes/leaderSignatures"));
 app.use("/api/forms/rack-inspection", require("./routes/forms/rackInspection"));
+app.use("/api/forms/ladder-inspection", require("./routes/forms/ladderInspection"));
+app.use("/api/forms/housekeeping-inspection", require("./routes/forms/housekeepingInspection"));
 
 // ⭐ GENERIC /api ROUTES LAST
 app.use('/api', healthcheckRoute);
