@@ -90,13 +90,13 @@ function drawHeader(doc, rackId) {
     .fillColor(COLOR.white)
     .font(FONT.bold)
     .fontSize(15)
-    .text("DAL-TILE  ·  MUSKOGEE", logoRight + 12, 16, { lineBreak: false });
+    .text("  DAL-TILE  ·  MUSKOGEE", logoRight + 12, 16, { lineBreak: false });
  
   doc
     .font(FONT.regular)
     .fontSize(10)
     .fillColor("rgba(255,255,255,0.80)")
-    .text("Rack Safety Inspection Report", logoRight + 12, 36, { lineBreak: false });
+    .text("  Rack Safety Inspection Report", logoRight + 12, 36, { lineBreak: false });
  
   // Rack ID pill (right-aligned inside the red bar)
   const pillLabel = `RACK  ${rackId}`;
