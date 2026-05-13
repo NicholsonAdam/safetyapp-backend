@@ -15,18 +15,46 @@ if (!fs.existsSync(PDF_DIR)) {
   fs.mkdirSync(PDF_DIR, { recursive: true });
 }
 
+// ─── Question + value maps for clean PDF output ──────────────────────────────
+const QUESTION_MAP = {
+  uprightsDamage:   "Damage to uprights or columns?",
+  beamsDamage:      "Damage to beams or cross-members?",
+  lockingPins:      "Missing or damaged safety locking pins?",
+  beamDeflection:   "Beam deflection or sagging?",
+  deckingCondition: "Damaged or missing decking?",
+  rustCorrosion:    "Rust, corrosion, or metal fatigue?",
+  impactDamage:     "Evidence of forklift impact?",
+  rackFeet:         "If present, are Rack Feet in good condition?",
+  anchorsSecure:    "Anchors and base plates secure?",
+  plumbFrontBack:   "Rack vertical front-to-back? (standing straight, no forward/backward lean)",
+  plumbLeftRight:   "Rack vertical left-to-right? (standing straight, no side lean)",
+  leaning:          "Any leaning or instability?",
+  overloaded:       "Any signs of overloading?",
+  palletCondition:  "Pallets in good condition?",
+  labelsVisible:    "Load capacity labels visible?",
+  aislesClear:      "Aisles clear and unobstructed?",
+  sprinklerClearance:"Proper clearance from sprinklers?",
+  fireExitClear:    "Fire exits and extinguishers clear?",
+};
+
+const VALUE_MAP = {
+  yes: "Good",
+  no:  "Issue",
+  na:  "Not Applicable",
+};
+
 // ─── POST /api/forms/rack-inspection ───────────────────────────────
 router.post("/", uploadPhotos.single("photo"), async (req, res) => {
   try {
     const {
       rackId,
       notes,
+      submitter,
       ...fields
     } = req.body;
 
-    // ⭐ Pull employee_id + employee_name from headers
+    // ⭐ Pull employee_id from headers (REAL FK)
     const employeeId = req.headers["employee_id"];
-    const employeeName = req.headers["employee_name"] || "Unknown";
 
     if (!employeeId) {
       return res.status(400).json({
@@ -34,6 +62,8 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
         error: "Missing employee_id header."
       });
     }
+
+    const submittedBy = submitter || "Unknown";
 
     // ⭐ Photo saved to persistent disk automatically:
     const photoPath = req.file ? req.file.path : null;
@@ -56,7 +86,13 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
        .fill("#B30000");
 
     try {
-      doc.image(path.join(__dirname, "../public/logo.jpg"), 40, 20, { width: 70 });
+      // backend/public/logo.jpg  (this file must exist)
+      doc.image(
+        path.join(__dirname, "..", "..", "public", "logo.jpg"),
+        40,
+        20,
+        { width: 70 }
+      );
     } catch (e) {
       console.log("Logo not found, skipping logo render.");
     }
@@ -86,7 +122,7 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     doc.font("Helvetica-Bold")
        .text("Submitted By:", 55, 145)
        .font("Helvetica")
-       .text(employeeName, 200, 145);
+       .text(submittedBy, 200, 145);
 
     doc.font("Helvetica-Bold")
        .text("Employee ID:", 55, 165)
@@ -115,15 +151,18 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     doc.fillColor("#000000")
        .moveDown(2);
 
-    // ===== FORM FIELDS (use actual question text, not ugly keys) =====
-    Object.entries(fields).forEach(([question, value]) => {
+    // ===== FORM FIELDS (mapped to readable questions + values) =====
+    Object.entries(fields).forEach(([key, rawValue]) => {
+      const question = QUESTION_MAP[key] || key;
+      const mappedValue = VALUE_MAP[rawValue] || rawValue || "None";
+
       doc.font("Helvetica-Bold")
          .fontSize(12)
          .text(question + ":");
 
       doc.font("Helvetica")
          .fontSize(11)
-         .text(value || "None");
+         .text(mappedValue);
 
       doc.moveDown(1);
     });
