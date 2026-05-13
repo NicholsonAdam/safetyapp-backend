@@ -116,7 +116,7 @@ function drawHeader(doc, ladderId) {
     doc
       .font(FONT.bold)
       .fontSize(10)
-      .fillColor(COLOR.white)
+      .fillColor(COLOR.charcoal)
       .text(pillLabel, pillX, 31, { width: pillW, align: "center", lineBreak: false });
   }
 
