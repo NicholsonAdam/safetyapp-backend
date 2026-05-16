@@ -19,7 +19,6 @@ const AREA_LEADERS = {
 };
 
 const SAFETY_TEAM = ["103118", "123850", "245177"];
-const pool = require('../config/db');
 // Allowed statuses for each submission type
 const BBS_STATUSES = [
   'awaiting_assignment',
