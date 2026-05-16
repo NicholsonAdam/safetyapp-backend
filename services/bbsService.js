@@ -1,9 +1,5 @@
-console.log("USING FILE:", __filename);
 const pool = require('../config/db');
 
-// =========================
-// FETCH ALL BBS RECORDS
-// =========================
 exports.fetchAllBBS = async () => {
   const result = await pool.query(`
     SELECT *
@@ -13,14 +9,7 @@ exports.fetchAllBBS = async () => {
   return result.rows;
 };
 
-// =========================
-// INSERT NEW BBS RECORD
-// =========================
 exports.insertBBS = async (data, photo_paths = []) => {
-  console.log("🟦 insertBBS STARTED");
-  console.log("Incoming data:", data);
-  console.log("Incoming photo paths:", photo_paths);
-
   const {
     date,
     observer_id,
@@ -48,7 +37,6 @@ exports.insertBBS = async (data, photo_paths = []) => {
     followup_contact
   } = data;
 
-  // Parse additional observers
   let additionalObservers = [];
   try {
     if (data.additional_observers_array) {
@@ -58,7 +46,6 @@ exports.insertBBS = async (data, photo_paths = []) => {
     console.error("Error parsing additional_observers_array:", err);
   }
 
-  // Leader lookup
   const leaderResult = await pool.query(
     `SELECT leader_id FROM employees WHERE employee_id = $1`,
     [observer_id]
@@ -74,12 +61,8 @@ exports.insertBBS = async (data, photo_paths = []) => {
     leader_name = leaderNameResult.rows[0]?.name || null;
   }
 
-  // =========================
-  // SQL INSERT
-  // =========================
   const result = await pool.query(
-    `
-    INSERT INTO bbs_observations (
+    `INSERT INTO bbs_observations (
       date, observer_id, observer_name, additional_observers,
       area, shift, job_area, job_task,
       ppe_safe, ppe_concern, ppe_comments,
@@ -105,45 +88,35 @@ exports.insertBBS = async (data, photo_paths = []) => {
       $26,$27,
       $28
     )
-    RETURNING *;
-    `,
+    RETURNING *`,
     [
       date,
       observer_id,
       observer_name,
       additionalObservers.join(","),
-
       area,
       shift,
       job_area,
       job_task,
-
       ppe_safe === "true" || ppe_safe === true,
       ppe_concern === "true" || ppe_concern === true,
       ppe_comments,
-
       position_safe === "true" || position_safe === true,
       position_concern === "true" || position_concern === true,
       position_comments,
-
       tools_safe === "true" || tools_safe === true,
       tools_concern === "true" || tools_concern === true,
       tools_comments,
-
       conditions_safe === "true" || conditions_safe === true,
       conditions_concern === "true" || conditions_concern === true,
       conditions_comments,
-
       unsafe_about_activity,
       promote_safety,
-
       team_member_comments,
       observer_comments,
-
       photo_paths,
       leader_id,
       leader_name,
-
       followup_contact
     ]
   );

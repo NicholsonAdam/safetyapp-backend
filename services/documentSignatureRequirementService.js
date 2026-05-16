@@ -1,23 +1,28 @@
-// documentSignatureRequirementService.js
-
 const DocumentSignatureRequirements = require('../models/documentSignatureRequirements');
-const DocumentSignatures = require('./documentSignatureService'); // REQUIRED FIX
+const DocumentSignatures = require('./documentSignatureService');
+const db = require('../config/db');
 
 const documentSignatureRequirementService = {
+
   async assignRequirementsToEmployees({ documentId, documentVersionId, employeeIds, assignedBy }) {
-    const created = [];
+    if (!employeeIds.length) return [];
 
-    for (const employeeId of employeeIds) {
-      const requirement = await DocumentSignatureRequirements.createRequirement({
-        documentId,
-        documentVersionId,
-        employeeId,
-        assignedBy
-      });
-      created.push(requirement);
-    }
+    const values = [];
+    const placeholders = employeeIds.map((id, i) => {
+      const base = i * 4;
+      values.push(documentId, documentVersionId, id, assignedBy);
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
+    });
 
-    return created;
+    const query = `
+      INSERT INTO document_signature_requirements
+        (document_id, document_version_id, employee_id, assigned_by)
+      VALUES ${placeholders.join(", ")}
+      RETURNING *
+    `;
+
+    const { rows } = await db.query(query, values);
+    return rows;
   },
 
   async getRequirementsForDocumentVersion(documentId, documentVersionId) {
@@ -30,9 +35,7 @@ const documentSignatureRequirementService = {
 
   async getRequirementForEmployeeAndDocumentVersion(documentId, documentVersionId, employeeId) {
     return DocumentSignatureRequirements.getRequirementForEmployeeAndDocumentVersion(
-      documentId,
-      documentVersionId,
-      employeeId
+      documentId, documentVersionId, employeeId
     );
   },
 
@@ -40,7 +43,6 @@ const documentSignatureRequirementService = {
     await DocumentSignatureRequirements.deleteRequirementsForDocumentVersion(documentId, documentVersionId);
   },
 
-  // REQUIRED FIX — this method was missing a comma AND missing the import
   async getSignaturesForDocumentVersion(documentId, documentVersionId) {
     return DocumentSignatures.getSignaturesForDocumentVersion(documentId, documentVersionId);
   }

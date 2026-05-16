@@ -1,4 +1,3 @@
-// backend/services/observationAssignmentsService.js
 const pool = require('../config/db');
 
 exports.assignObservation = async (observationId, assignments) => {

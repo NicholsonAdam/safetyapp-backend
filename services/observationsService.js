@@ -1,19 +1,24 @@
 const { getEmployeeById } = require('../models/employeeModel');
 const { sendEmail } = require('../services/emailService');
 const { assignObservation } = require('../models/observation_assignments');
+const pool = require('../config/db');
+
+const ADMIN_ID = process.env.SAFETY_ADMIN_ID || "103118";
+
 const AREA_LEADERS = {
-  "Body Prep": "103118",
-  "Press": "103118",
-  "Glazeline": "103118",
-  "Kiln": "103118",
-  "LGV": "103118",
-  "Glaze Prep": "103118",
-  "Sorting": "103118",
-  "Rectifying": "103118",
-  "Administration": "103118",
-  "Maintenance": "103118"
+  "Body Prep":      ["226274", "120659"],
+  "Press":          ["252908", "66241"],
+  "Glazeline":      ["66241", "240477", "137329", "238469", "90764"],
+  "Kiln":           ["176018", "49077"],
+  "LGV":            ["113538"],
+  "Glaze Prep":     ["67635", "77217"],
+  "Sorting":        ["49077", "151972", "103403", "97572", "232229"],
+  "Rectifying":     ["49077", "151972", "103403", "97572", "232229"],
+  "Administration": ["102141", "49619"],
+  "Maintenance":    ["81948"]
 };
-const SAFETY_TEAM = ["103118"]; // add more IDs later
+
+const SAFETY_TEAM = ["103118", "123850", "245177"];
 const pool = require('../config/db');
 // Allowed statuses for each submission type
 const BBS_STATUSES = [
@@ -193,16 +198,16 @@ const photoBlock = photoUrls.length > 0
   `
   : '';
 
-const areaLeaderId = AREA_LEADERS[savedObservation.area];
+const areaLeaderIds = AREA_LEADERS[savedObservation.area] || [];
 
 const assignments = [];
 
-if (areaLeaderId) {
+areaLeaderIds.forEach(id => {
   assignments.push({
-    assigned_to_employee_id: areaLeaderId,
+    assigned_to_employee_id: id,
     role: 'area_leader'
   });
-}
+});
 
 SAFETY_TEAM.forEach(id => {
   assignments.push({
@@ -212,7 +217,7 @@ SAFETY_TEAM.forEach(id => {
 });
 
 assignments.push({
-  assigned_to_employee_id: "103118",
+  assigned_to_employee_id: ADMIN_ID,
   role: 'admin'
 });
 
@@ -230,8 +235,8 @@ const messageBody = `
 `;
 
   // Notify Area Leader
-  if (areaLeaderId) {
-    const leader = await getEmployeeById(areaLeaderId);
+  for (const id of areaLeaderIds) {
+    const leader = await getEmployeeById(id);
     if (leader?.email) {
       await sendEmail(
         leader.email,
