@@ -5,6 +5,8 @@ const fs = require("fs");
 const PDFDocument = require("pdfkit");
  
 const { uploadPhotos } = require("../../middleware/upload");
+const pool = require("../../config/db");
+const RACK_FOLDER_ID = parseInt(process.env.RACK_INSPECTION_FOLDER_ID) || 19;
  
 const PDF_DIR = "/data/documents/rack-inspection";
 if (!fs.existsSync(PDF_DIR)) {
@@ -418,13 +420,11 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     doc.end();
  
     stream.on("finish", async () => {
-      const pool = require("../../config/db");
- 
       const docResult = await pool.query(
         `INSERT INTO documents (folder_id, title, description, created_by, created_at, is_active)
          VALUES ($1, $2, $3, $4, NOW(), true)
          RETURNING id`,
-        [19, `Rack Inspection - ${rackId}`, notes || "", employeeId]
+        [RACK_FOLDER_ID, `Rack Inspection - ${rackId}`, notes || "", employeeId]
       );
  
       const documentId = docResult.rows[0].id;

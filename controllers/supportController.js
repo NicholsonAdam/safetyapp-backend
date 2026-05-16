@@ -1,72 +1,38 @@
-const nodemailer = require("nodemailer");
 const pool = require("../config/db");
+const { sendEmail } = require("../services/emailService");
 
-// Optional: only if you create a Support model
+const SUPPORT_RECIPIENT = process.env.SUPPORT_EMAIL || "adam.nicholson1@daltile.com";
+
 let Support = null;
 try {
   Support = require("../models/Support");
-} catch (e) {
-  // No model yet — safe to ignore
-}
+} catch (e) {}
 
 exports.createSupport = async (req, res) => {
   try {
     const { submitter_id, submitter_name, date, platform, issue } = req.body;
 
-    // DEBUG: what does Multer actually see?
-    console.log("SUPPORT REQ.FILE =", req.file);
-
-    // Multer file
     const photo = req.file ? req.file.filename : null;
-
-    // Base URL for images
-    const BASE_URL = "https://safetyapp-backend-docker.onrender.com";
+    const BASE_URL = process.env.BACKEND_URL || "https://safetyapp-backend-docker.onrender.com";
     const photoUrl = photo ? `${BASE_URL}/uploads/${photo}` : null;
 
-    // Optional DB record
     let record = null;
     if (Support) {
-      record = await Support.create({
-        date,
-        platform,
-        issue,
-        photo_path: photo,
-      });
+      record = await Support.create({ date, platform, issue, photo_path: photo });
     }
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const photoBlock = photoUrl
+      ? `<p><strong>Photo:</strong></p><img src="${photoUrl}" style="max-width:400px;border:1px solid #ccc;border-radius:4px;" />`
+      : "";
 
-    // Build photo block + always show URL text for debugging
-    let photoBlock = "";
-    if (photoUrl) {
-      photoBlock =
-        `<p><strong>Photo:</strong></p>` +
-        `<img src="${photoUrl}" style="max-width:400px;border:1px solid #ccc;border-radius:4px;" />`;
-    }
-
-    const html =
-      `<h2>New Support Request</h2>` +
+    const messageBody =
       `<p><strong>Submitted By:</strong> ${submitter_name} (${submitter_id})</p>` +
       `<p><strong>Date:</strong> ${date}</p>` +
       `<p><strong>Platform:</strong> ${platform}</p>` +
       `<p><strong>Issue:</strong><br>${issue}</p>` +
-      `<p><strong>Photo URL (debug):</strong> ${photoUrl || "NONE"}</p>` +
       photoBlock;
 
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to: "adam.nicholson1@daltile.com",
-      subject: "New Support Request Submitted",
-      html,
-    });
+    await sendEmail(SUPPORT_RECIPIENT, "New Support Request Submitted", messageBody);
 
     res.json({ success: true, id: record ? record.id : null });
   } catch (err) {

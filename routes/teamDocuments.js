@@ -39,7 +39,8 @@ router.get('/:employeeId', async (req, res) => {
     const { employeeId } = req.params;
 
     // 1. Get ALL subfolders under Public Access (folder_id = 15)
-    const folderIds = await getAllSubfolderIds(15); // already includes 15
+    const PUBLIC_FOLDER_ID = parseInt(process.env.PUBLIC_DOCUMENTS_FOLDER_ID) || 15;
+    const folderIds = await getAllSubfolderIds(PUBLIC_FOLDER_ID);
 
     // 2. Fetch all documents in ANY of those folders
     const { rows: docs } = await db.query(

@@ -1,56 +1,40 @@
 const pool = require("../config/db");
-const nodemailer = require("nodemailer");
+const { sendEmail } = require("../services/emailService");
 
-// Normalize reportTypes into a clean JS array
+const SAFETY_TEAM_IDS = process.env.SAFETY_ADMIN_ID
+  ? [process.env.SAFETY_ADMIN_ID, "245177", "123850"]
+  : ["103118", "245177", "123850"];
+
 function normalizeReportTypes(input) {
   if (!input) return [];
   if (Array.isArray(input)) return input;
-
   if (typeof input === "string") {
     try {
       const parsed = JSON.parse(input);
       if (Array.isArray(parsed)) return parsed;
     } catch (e) {}
   }
-
   return [input];
 }
 
-// =========================
-// CREATE NEAR MISS
-// =========================
 exports.createNearMiss = async (req, res) => {
-  console.log("REQ BODY:", req.body);
-
   try {
     const {
-      department,
-      location,
-      date,
-      additionalTeam,
-      description,
-      actionsTaken,
-      suggestion,
-      followup,
-      status,
-      observer_id,
-      observer_name
+      department, location, date, additionalTeam,
+      description, actionsTaken, suggestion,
+      followup, status, observer_id, observer_name
     } = req.body;
 
-    const reportTypesRaw = req.body.reportTypes;
-    const normalizedTypes = normalizeReportTypes(reportTypesRaw);
-
+    const normalizedTypes = normalizeReportTypes(req.body.reportTypes);
     const photoPath = req.file ? req.file.filename : null;
 
     const leaderResult = await pool.query(
-      `SELECT leader_id FROM employees WHERE employee_id = $1`,
-      [observer_id]
+      `SELECT leader_id FROM employees WHERE employee_id = $1`, [observer_id]
     );
     const leaderId = leaderResult.rows[0]?.leader_id || null;
 
     const shiftResult = await pool.query(
-      `SELECT shift FROM employees WHERE employee_id = $1`,
-      [observer_id]
+      `SELECT shift FROM employees WHERE employee_id = $1`, [observer_id]
     );
     const employeeShift = shiftResult.rows[0]?.shift || null;
 
@@ -62,21 +46,10 @@ exports.createNearMiss = async (req, res) => {
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       RETURNING *`,
       [
-        observer_id,
-        observer_name,
-        department,
-        location,
-        date,
-        employeeShift,
-        additionalTeam,
-        JSON.stringify(normalizedTypes),
-        description,
-        actionsTaken,
-        suggestion,
-        followup,
-        status || "Open",
-        leaderId,
-        photoPath
+        observer_id, observer_name, department, location, date,
+        employeeShift, additionalTeam, JSON.stringify(normalizedTypes),
+        description, actionsTaken, suggestion,
+        followup, status || "Open", leaderId, photoPath
       ]
     );
 
@@ -85,78 +58,51 @@ exports.createNearMiss = async (req, res) => {
     if (followup === "yes") {
       try {
         let leaderEmail = null;
-
         if (leaderId) {
           const leaderEmailResult = await pool.query(
-            `SELECT email FROM employees WHERE employee_id = $1`,
-            [leaderId]
+            `SELECT email FROM employees WHERE employee_id = $1`, [leaderId]
           );
           leaderEmail = leaderEmailResult.rows[0]?.email || null;
         }
 
         const safetyResult = await pool.query(
-          `SELECT email FROM employees WHERE employee_id IN ('103118','245177','123850')`
+          `SELECT email FROM employees WHERE employee_id = ANY($1)`,
+          [SAFETY_TEAM_IDS]
         );
         const safetyEmails = safetyResult.rows.map(r => r.email);
-
         const recipients = [leaderEmail, ...safetyEmails].filter(Boolean);
 
-        const transporter = nodemailer.createTransport({
-          host: "smtp.gmail.com",
-          port: 587,
-          secure: false,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-          }
-        });
+        const messageBody = `
+          <p><strong>Observer:</strong> ${observer_name} (${observer_id})</p>
+          <p><strong>Department:</strong> ${department}</p>
+          <p><strong>Location:</strong> ${location}</p>
+          <p><strong>Date:</strong> ${date}</p>
+          <p><strong>Report Types:</strong> ${normalizedTypes.join(", ")}</p>
+          <p><strong>Description:</strong> ${description}</p>
+          <p><strong>Immediate Actions:</strong> ${actionsTaken}</p>
+          <p><strong>Suggested Corrective Action:</strong> ${suggestion}</p>
+          <p><strong>Additional Team:</strong> ${additionalTeam}</p>
+          <p><strong>Follow-Up Requested:</strong> YES</p>
+        `;
 
-        await transporter.sendMail({
-          from: process.env.SMTP_USER,
-          to: recipients,
-          subject: "Near Miss Follow-Up Requested",
-          html: `
-            <h2>Near Miss Follow-Up Requested</h2>
-
-            <p><strong>Observer:</strong> ${observer_name} (${observer_id})</p>
-            <p><strong>Department:</strong> ${department}</p>
-            <p><strong>Location:</strong> ${location}</p>
-            <p><strong>Date:</strong> ${date}</p>
-            <p><strong>Report Types:</strong> ${normalizedTypes.join(", ")}</p>
-
-            <p><strong>Description:</strong> ${description}</p>
-            <p><strong>Immediate Actions:</strong> ${actionsTaken}</p>
-            <p><strong>Suggested Corrective Action:</strong> ${suggestion}</p>
-            <p><strong>Additional Team:</strong> ${additionalTeam}</p>
-
-            <p><strong>Follow-Up Requested:</strong> YES</p>
-
-            <hr/>
-            <p>This message was automatically generated by the Safety App.</p>
-          `
-        });
-
+        for (const recipient of recipients) {
+          await sendEmail(recipient, "Near Miss Follow-Up Requested", messageBody);
+        }
       } catch (emailErr) {
         console.error("Near Miss follow-up email failed:", emailErr);
       }
     }
 
     res.json(saved);
-
   } catch (err) {
     console.error("Create Near Miss Error:", err);
     res.status(500).json({ error: "Failed to create Near Miss report" });
   }
 };
 
-// =========================
-// GET ALL
-// =========================
 exports.getAllNearMiss = async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM nearmiss_reports ORDER BY id DESC"
-    );
+    const result = await pool.query("SELECT * FROM nearmiss_reports ORDER BY id DESC");
     res.json(result.rows);
   } catch (err) {
     console.error("Get All Near Miss Error:", err);
@@ -164,20 +110,12 @@ exports.getAllNearMiss = async (req, res) => {
   }
 };
 
-// =========================
-// GET ONE
-// =========================
 exports.getNearMissById = async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM nearmiss_reports WHERE id = $1",
-      [req.params.id]
+      "SELECT * FROM nearmiss_reports WHERE id = $1", [req.params.id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Not found" });
-    }
-
+    if (result.rows.length === 0) return res.status(404).json({ error: "Not found" });
     res.json(result.rows[0]);
   } catch (err) {
     console.error("Get Near Miss Error:", err);
@@ -185,62 +123,32 @@ exports.getNearMissById = async (req, res) => {
   }
 };
 
-// =========================
-// UPDATE
-// =========================
 exports.updateNearMiss = async (req, res) => {
   try {
-    const id = req.params.id;
-
     const {
-      department,
-      location,
-      date,
-      additionalTeam,
-      description,
-      actionsTaken,
-      suggestion,
-      followup,
-      status,
-      shift
+      department, location, date, additionalTeam,
+      description, actionsTaken, suggestion,
+      followup, status, shift
     } = req.body;
 
-    const reportTypesRaw = req.body.reportTypes;
-    const normalizedTypes = normalizeReportTypes(reportTypesRaw);
-
+    const normalizedTypes = normalizeReportTypes(req.body.reportTypes);
     const photoPath = req.file ? req.file.filename : null;
 
     const result = await pool.query(
       `UPDATE nearmiss_reports SET
-        department = $1,
-        location = $2,
-        date = $3,
-        additional_team = $4,
-        report_types = $5,
-        description = $6,
-        actions_taken = $7,
-        suggestion = $8,
-        followup = $9,
-        status = $10,
-        shift = $11,
+        department = $1, location = $2, date = $3,
+        additional_team = $4, report_types = $5, description = $6,
+        actions_taken = $7, suggestion = $8, followup = $9,
+        status = $10, shift = $11,
         photo_path = COALESCE($12, photo_path),
         updated_at = NOW()
       WHERE id = $13
       RETURNING *`,
       [
-        department,
-        location,
-        date,
-        additionalTeam,
-        JSON.stringify(normalizedTypes),
-        description,
-        actionsTaken,
-        suggestion,
-        followup,
-        status,
-        shift,
-        photoPath,
-        id
+        department, location, date, additionalTeam,
+        JSON.stringify(normalizedTypes), description,
+        actionsTaken, suggestion, followup,
+        status, shift, photoPath, req.params.id
       ]
     );
 
@@ -251,14 +159,9 @@ exports.updateNearMiss = async (req, res) => {
   }
 };
 
-// =========================
-// DELETE
-// =========================
 exports.deleteNearMiss = async (req, res) => {
   try {
-    await pool.query("DELETE FROM nearmiss_reports WHERE id = $1", [
-      req.params.id,
-    ]);
+    await pool.query("DELETE FROM nearmiss_reports WHERE id = $1", [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     console.error("Delete Near Miss Error:", err);

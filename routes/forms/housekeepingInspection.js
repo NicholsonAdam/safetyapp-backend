@@ -5,6 +5,8 @@ const fs = require("fs");
 const PDFDocument = require("pdfkit");
 
 const { uploadPhotos } = require("../../middleware/upload");
+const pool = require("../../config/db");
+const HOUSEKEEPING_FOLDER_ID = parseInt(process.env.HOUSEKEEPING_INSPECTION_FOLDER_ID) || 21;
 
 const PDF_DIR = "/data/documents/housekeeping-inspection";
 if (!fs.existsSync(PDF_DIR)) {
@@ -400,13 +402,11 @@ router.post("/", uploadPhotos.single("photo"), async (req, res) => {
     doc.end();
 
     stream.on("finish", async () => {
-      const pool = require("../../config/db");
-
       const docResult = await pool.query(
         `INSERT INTO documents (folder_id, title, description, created_by, created_at, is_active)
          VALUES ($1, $2, $3, $4, NOW(), true)
          RETURNING id`,
-        [21, `Housekeeping Inspection - ${area}`, notes || "", employeeId]
+        [HOUSEKEEPING_FOLDER_ID, `Housekeeping Inspection - ${area}`, notes || "", employeeId]
       );
 
       const documentId = docResult.rows[0].id;
