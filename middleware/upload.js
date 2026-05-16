@@ -2,46 +2,45 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// DIRECTORIES
 const PHOTO_DIR = "/data/uploads";
 const DOCUMENT_DIR = "/data/documents";
 
-// Ensure directories exist
 [PHOTO_DIR, DOCUMENT_DIR].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// PHOTO STORAGE (BBS, Near Miss, Signatures, etc.)
 const photoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, PHOTO_DIR);
-  },
+  destination: (req, file, cb) => cb(null, PHOTO_DIR),
   filename: (req, file, cb) => {
     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, unique + ext);
+    cb(null, unique + path.extname(file.originalname));
   }
 });
 
-// DOCUMENT STORAGE (PDF, DOCX, etc.)
 const documentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, DOCUMENT_DIR);
-  },
+  destination: (req, file, cb) => cb(null, DOCUMENT_DIR),
   filename: (req, file, cb) => {
     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, unique + ext);
+    cb(null, unique + path.extname(file.originalname));
   }
 });
 
-// EXPORT TWO UPLOADERS
-const uploadPhotos = multer({ storage: photoStorage });
-const uploadDocuments = multer({ storage: documentStorage });
-
-module.exports = {
-  uploadPhotos,
-  uploadDocuments
+const photoFilter = (req, file, cb) => {
+  const allowed = /jpeg|jpg|png|gif|webp/;
+  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+  const mime = allowed.test(file.mimetype);
+  if (ext && mime) return cb(null, true);
+  cb(new Error("Only image files are allowed"));
 };
+
+const documentFilter = (req, file, cb) => {
+  const allowed = /pdf|docx|doc|xlsx|xls|csv|txt/;
+  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+  if (ext) return cb(null, true);
+  cb(new Error("Unsupported document type"));
+};
+
+const uploadPhotos = multer({ storage: photoStorage, fileFilter: photoFilter });
+const uploadDocuments = multer({ storage: documentStorage, fileFilter: documentFilter });
+
+module.exports = { uploadPhotos, uploadDocuments };
