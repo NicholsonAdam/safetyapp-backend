@@ -82,6 +82,7 @@ app.use("/api/folders",                         documentFoldersRoutes);
 
 // Serve GEMBA PDFs before the documents router intercepts the request
 app.use("/api/documents/GEMBA",                 express.static("/data/documents"));
+app.use("/api/documents/INCIDENT", express.static("/data/documents/incidents"));
 
 app.use("/api/documents",                       documentsRoutes);
 app.use("/api/documentVersions",                documentVersionsRoutes);
@@ -98,6 +99,7 @@ app.use("/api/forms/rack-inspection",           require("./routes/forms/rackInsp
 app.use("/api/forms/ladder-inspection",         require("./routes/forms/ladderInspection"));
 app.use("/api/forms/housekeeping-inspection",   require("./routes/forms/housekeepingInspection"));
 app.use('/api/gemba', require('./routes/gemba'));
+app.use('/api/incidents', require('./routes/incidents'));
 
 // GENERIC /api ROUTES LAST
 app.use('/api',                                 healthcheckRoute);
