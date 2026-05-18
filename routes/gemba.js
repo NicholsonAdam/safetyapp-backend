@@ -6,56 +6,230 @@ const fs       = require('fs');
 const { uploadPhotos } = require('../middleware/upload');
 
 // ─── PDF GENERATION ──────────────────────────────────────────────
-// Uses pdfkit (npm install pdfkit)
-// Falls back gracefully if not installed
 let PDFDocument;
 try { PDFDocument = require('pdfkit'); } catch (e) { PDFDocument = null; }
 
+// ─── Brand tokens (matches housekeeping inspection) ───────────────
+const COLOR = {
+  red:       '#B30000',
+  redDark:   '#7A0000',
+  redLight:  '#FFE8E8',
+  charcoal:  '#1A1A1A',
+  midGray:   '#4A4A4A',
+  lightGray: '#F4F4F4',
+  border:    '#DDDDDD',
+  white:     '#FFFFFF',
+  good:      '#1A7A3F',
+  goodBg:    '#E8F5EE',
+  issue:     '#B30000',
+  issueBg:   '#FFE8E8',
+  warn:      '#B56000',
+  warnBg:    '#FFF3E0',
+  na:        '#5A5A5A',
+  naBg:      '#F0F0F0',
+};
+
+const FONT = {
+  regular: 'Helvetica',
+  bold:    'Helvetica-Bold',
+  oblique: 'Helvetica-Oblique',
+};
+
+const PAGE_W  = 612;
+const PAGE_H  = 792;
+const MARGIN  = 40;
+const CONTENT = PAGE_W - MARGIN * 2;
+
+// ─── Answer badge colours ─────────────────────────────────────────
+const ANSWER_META = {
+  'Compliant':          { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Excellent':          { color: COLOR.good,  bg: COLOR.goodBg  },
+  'None':               { color: COLOR.good,  bg: COLOR.goodBg  },
+  'All Present':        { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Clear':              { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Running':            { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Good':               { color: COLOR.good,  bg: COLOR.goodBg  },
+  'High':               { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Yes':                { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Optimal':            { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Fully Staffed':      { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Current':            { color: COLOR.good,  bg: COLOR.goodBg  },
+  'Minor Issues':       { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Acceptable':         { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Minor':              { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Some Missing':       { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Partially Blocked':  { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Low':                { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Fair':               { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Moderate':           { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Mostly':             { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Overdue':            { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Partially':          { color: COLOR.warn,  bg: COLOR.warnBg  },
+  '1 Short':            { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Yes - Minor':        { color: COLOR.warn,  bg: COLOR.warnBg  },
+  'Non-Compliant':      { color: COLOR.issue, bg: COLOR.issueBg },
+  'Needs Attention':    { color: COLOR.issue, bg: COLOR.issueBg },
+  'Severe':             { color: COLOR.issue, bg: COLOR.issueBg },
+  'Needs Update':       { color: COLOR.issue, bg: COLOR.issueBg },
+  'Blocked':            { color: COLOR.issue, bg: COLOR.issueBg },
+  'Not Present':        { color: COLOR.issue, bg: COLOR.issueBg },
+  'Down':               { color: COLOR.issue, bg: COLOR.issueBg },
+  '2+ Short':           { color: COLOR.issue, bg: COLOR.issueBg },
+  'Poor':               { color: COLOR.issue, bg: COLOR.issueBg },
+  'Disengaged':         { color: COLOR.issue, bg: COLOR.issueBg },
+  'No':                 { color: COLOR.issue, bg: COLOR.issueBg },
+  'Critical':           { color: COLOR.issue, bg: COLOR.issueBg },
+  'Shortage':           { color: COLOR.issue, bg: COLOR.issueBg },
+  'Yes - Moderate':     { color: COLOR.issue, bg: COLOR.issueBg },
+  'Yes - Critical':     { color: COLOR.issue, bg: COLOR.issueBg },
+};
+
+const getAnswerMeta = val => ANSWER_META[val] || { color: COLOR.na, bg: COLOR.naBg };
+
+// ─── Layout helpers ───────────────────────────────────────────────
+function drawHeader(doc, department, area) {
+  doc.rect(0, 0, PAGE_W, 72).fill(COLOR.red);
+
+  const LOGO_PATH = path.join(__dirname, '..', 'public', 'logo.jpg');
+  let logoRight = MARGIN;
+  try { doc.image(LOGO_PATH, MARGIN, 14, { height: 44 }); logoRight = MARGIN + 60; } catch (_) {}
+
+  doc.fillColor(COLOR.white).font(FONT.bold).fontSize(15)
+     .text('  DAL-TILE  ·  MUSKOGEE', logoRight + 12, 16, { lineBreak: false });
+
+  doc.font(FONT.regular).fontSize(10).fillColor('rgba(255,255,255,0.80)')
+     .text('  Leadership Gemba Walk Report', logoRight + 12, 36, { lineBreak: false });
+
+  if (department) {
+    const pillLabel = `${department}  ·  ${area || ''}`;
+    const pillW = doc.widthOfString(pillLabel, { fontSize: 10 }) + 24;
+    const pillX = PAGE_W - MARGIN - pillW;
+    doc.roundedRect(pillX, 22, pillW, 26, 4).fill('rgba(0,0,0,0.25)');
+    doc.font(FONT.bold).fontSize(10).fillColor(COLOR.white)
+       .text(pillLabel, pillX, 31, { width: pillW, align: 'center', lineBreak: false });
+  }
+
+  doc.fillColor(COLOR.charcoal);
+  return 84;
+}
+
+function drawFooter(doc) {
+  const y = PAGE_H - 28;
+  doc.moveTo(MARGIN, y - 4).lineTo(PAGE_W - MARGIN, y - 4).lineWidth(0.5).stroke(COLOR.border);
+  doc.font(FONT.regular).fontSize(8).fillColor(COLOR.midGray)
+     .text('Dal-Tile Safety App  ·  Muskogee Operations  ·  CONFIDENTIAL', MARGIN, y);
+  doc.text(
+    `Page ${doc.bufferedPageRange().start + doc.bufferedPageRange().count}`,
+    0, y, { align: 'right', width: PAGE_W - MARGIN }
+  );
+  doc.fillColor(COLOR.charcoal);
+}
+
+function metaRow(doc, label, value, x, y, colW) {
+  doc.font(FONT.bold).fontSize(8).fillColor(COLOR.midGray)
+     .text(label.toUpperCase(), x, y, { width: colW });
+  doc.font(FONT.regular).fontSize(10).fillColor(COLOR.charcoal)
+     .text(value || '—', x, y + 10, { width: colW });
+  return y + 28;
+}
+
+function sectionBar(doc, title, y, department, area) {
+  const BAR_H = 24;
+  if (y + BAR_H + 40 > PAGE_H - 60) {
+    doc.addPage();
+    drawHeader(doc, department, area);
+    drawFooter(doc);
+    y = 88;
+  }
+  doc.rect(MARGIN, y, CONTENT, BAR_H).fill(COLOR.red);
+  doc.font(FONT.bold).fontSize(10).fillColor(COLOR.white)
+     .text(title.toUpperCase(), MARGIN + 10, y + 7);
+  doc.fillColor(COLOR.charcoal);
+  return y + BAR_H + 8;
+}
+
+function answerRow(doc, question, value, y, department, area, rowIndex) {
+  const ROW_H   = 22;
+  const BADGE_W = 130;
+  const Q_W     = CONTENT - BADGE_W - 12;
+
+  if (y + ROW_H > PAGE_H - 60) {
+    doc.addPage();
+    drawHeader(doc, department, area);
+    drawFooter(doc);
+    y = 88;
+  }
+
+  const meta = getAnswerMeta(value);
+  if (rowIndex % 2 === 0) doc.rect(MARGIN, y, CONTENT, ROW_H).fill(COLOR.lightGray);
+
+  doc.font(FONT.regular).fontSize(9.5).fillColor(COLOR.charcoal)
+     .text(question, MARGIN + 8, y + 5, { width: Q_W });
+
+  const badgeX = MARGIN + Q_W + 12;
+  doc.roundedRect(badgeX, y + 3, BADGE_W, 16, 3).fill(meta.bg);
+  doc.font(FONT.bold).fontSize(8).fillColor(meta.color)
+     .text(value, badgeX, y + 6, { width: BADGE_W, align: 'center' });
+
+  return y + ROW_H;
+}
+
+function textRow(doc, question, value, y, department, area) {
+  if (!value || !value.trim()) return y;
+
+  const textH = Math.max(
+    doc.heightOfString(value.trim(), { width: CONTENT - 20, font: FONT.regular, fontSize: 9.5 }) + 16,
+    28
+  );
+
+  if (y + textH > PAGE_H - 60) {
+    doc.addPage();
+    drawHeader(doc, department, area);
+    drawFooter(doc);
+    y = 88;
+  }
+
+  doc.rect(MARGIN, y, CONTENT, textH).fill(COLOR.lightGray);
+  doc.font(FONT.bold).fontSize(8).fillColor(COLOR.midGray)
+     .text(question.toUpperCase(), MARGIN + 8, y + 5, { width: CONTENT - 16 });
+  doc.font(FONT.regular).fontSize(9.5).fillColor(COLOR.charcoal)
+     .text(value.trim(), MARGIN + 8, y + 15, { width: CONTENT - 16 });
+
+  return y + textH + 4;
+}
+
+// ─── GEMBA QUESTIONS ─────────────────────────────────────────────
 const GEMBA_QUESTIONS = [
-  // ── SAFETY ──────────────────────────────────────────────────────
-  { id: 'ppe_compliance',      section: 'Safety',              type: 'select',   label: 'PPE Compliance',                         options: ['Compliant','Minor Issues','Non-Compliant','N/A'] },
-  { id: 'housekeeping',        section: 'Safety',              type: 'select',   label: 'Housekeeping & 5S Condition',            options: ['Excellent','Acceptable','Needs Attention','Unacceptable'] },
-  { id: 'hazards_present',     section: 'Safety',              type: 'select',   label: 'Visible Hazards Present',               options: ['None','Minor','Moderate','Severe'] },
-  { id: 'safety_signage',      section: 'Safety',              type: 'select',   label: 'Safety Signage & Labels',               options: ['All Present','Some Missing','Needs Update','Missing'] },
-  { id: 'emergency_access',    section: 'Safety',              type: 'select',   label: 'Emergency Exits / Equipment Access',    options: ['Clear','Partially Blocked','Blocked'] },
-  { id: 'safety_observations', section: 'Safety',              type: 'text',     label: 'Safety Observations & Concerns' },
-
-  // ── QUALITY ─────────────────────────────────────────────────────
-  { id: 'defect_visible',      section: 'Quality',             type: 'select',   label: 'Visible Defects / Rework',              options: ['None','Low','Moderate','High'] },
-  { id: 'process_followed',    section: 'Quality',             type: 'select',   label: 'Standard Work / Process Being Followed',options: ['Yes','Mostly','Partially','No'] },
-  { id: 'quality_controls',    section: 'Quality',             type: 'select',   label: 'Quality Controls in Place',             options: ['All Present','Some Missing','Not Present'] },
-  { id: 'quality_observations',section: 'Quality',             type: 'text',     label: 'Quality Observations & Concerns' },
-
-  // ── PRODUCTIVITY ─────────────────────────────────────────────────
-  { id: 'line_running',        section: 'Productivity',        type: 'select',   label: 'Line / Equipment Running Status',       options: ['Running','Minor Downtime','Significant Downtime','Down'] },
-  { id: 'staffing_level',      section: 'Productivity',        type: 'select',   label: 'Staffing Level vs Plan',               options: ['Fully Staffed','1 Short','2+ Short','Overstaffed'] },
-  { id: 'bottleneck',          section: 'Productivity',        type: 'select',   label: 'Bottleneck / Constraint Visible',       options: ['None','Minor','Moderate','Significant'] },
-  { id: 'productivity_notes',  section: 'Productivity',        type: 'text',     label: 'Productivity Observations & Notes' },
-
-  // ── PEOPLE & ENGAGEMENT ──────────────────────────────────────────
-  { id: 'employee_engagement', section: 'People & Engagement', type: 'select',   label: 'Employee Engagement Level',            options: ['High','Moderate','Low','Disengaged'] },
-  { id: 'operator_feedback',   section: 'People & Engagement', type: 'text',     label: 'Operator / Team Member Feedback' },
-  { id: 'training_adequate',   section: 'People & Engagement', type: 'select',   label: 'Training Appears Adequate',            options: ['Yes','Mostly','Needs Improvement','No'] },
-
-  // ── EQUIPMENT & MAINTENANCE ──────────────────────────────────────
-  { id: 'equipment_condition', section: 'Equipment',           type: 'select',   label: 'Equipment / Tooling Condition',        options: ['Good','Fair','Poor','Critical'] },
-  { id: 'maintenance_issues',  section: 'Equipment',           type: 'text',     label: 'Maintenance Issues Observed' },
-  { id: 'lubrication_clean',   section: 'Equipment',           type: 'select',   label: 'Lubrication / Cleaning Status',        options: ['Current','Overdue','Unknown'] },
-
-  // ── MATERIAL FLOW ────────────────────────────────────────────────
-  { id: 'material_flow',       section: 'Material Flow',       type: 'select',   label: 'Material Flow & Inventory Staging',    options: ['Optimal','Acceptable','Excess WIP','Shortage'] },
-  { id: 'material_notes',      section: 'Material Flow',       type: 'text',     label: 'Material Flow Observations' },
-
-  // ── OVERALL ──────────────────────────────────────────────────────
-  { id: 'overall_rating',      section: 'Overall',             type: 'select',   label: 'Overall Area Rating',                  options: ['Excellent','Good','Fair','Poor'] },
-  { id: 'action_required',     section: 'Overall',             type: 'select',   label: 'Immediate Action Required',            options: ['No','Yes - Minor','Yes - Moderate','Yes - Critical'] },
-  { id: 'summary',             section: 'Overall',             type: 'text',     label: 'Summary & Recommendations' },
+  { id: 'ppe_compliance',      section: 'Safety',              type: 'select', label: 'PPE Compliance' },
+  { id: 'housekeeping',        section: 'Safety',              type: 'select', label: 'Housekeeping & 5S Condition' },
+  { id: 'hazards_present',     section: 'Safety',              type: 'select', label: 'Visible Hazards Present' },
+  { id: 'safety_signage',      section: 'Safety',              type: 'select', label: 'Safety Signage & Labels' },
+  { id: 'emergency_access',    section: 'Safety',              type: 'select', label: 'Emergency Exits / Equipment Access' },
+  { id: 'safety_observations', section: 'Safety',              type: 'text',   label: 'Safety Observations & Concerns' },
+  { id: 'defect_visible',      section: 'Quality',             type: 'select', label: 'Visible Defects / Rework' },
+  { id: 'process_followed',    section: 'Quality',             type: 'select', label: 'Standard Work / Process Being Followed' },
+  { id: 'quality_controls',    section: 'Quality',             type: 'select', label: 'Quality Controls in Place' },
+  { id: 'quality_observations',section: 'Quality',             type: 'text',   label: 'Quality Observations & Concerns' },
+  { id: 'line_running',        section: 'Productivity',        type: 'select', label: 'Line / Equipment Running Status' },
+  { id: 'staffing_level',      section: 'Productivity',        type: 'select', label: 'Staffing Level vs Plan' },
+  { id: 'bottleneck',          section: 'Productivity',        type: 'select', label: 'Bottleneck / Constraint Visible' },
+  { id: 'productivity_notes',  section: 'Productivity',        type: 'text',   label: 'Productivity Observations & Notes' },
+  { id: 'employee_engagement', section: 'People & Engagement', type: 'select', label: 'Employee Engagement Level' },
+  { id: 'operator_feedback',   section: 'People & Engagement', type: 'text',   label: 'Operator / Team Member Feedback' },
+  { id: 'training_adequate',   section: 'People & Engagement', type: 'select', label: 'Training Appears Adequate' },
+  { id: 'equipment_condition', section: 'Equipment',           type: 'select', label: 'Equipment / Tooling Condition' },
+  { id: 'maintenance_issues',  section: 'Equipment',           type: 'text',   label: 'Maintenance Issues Observed' },
+  { id: 'lubrication_clean',   section: 'Equipment',           type: 'select', label: 'Lubrication / Cleaning Status' },
+  { id: 'material_flow',       section: 'Material Flow',       type: 'select', label: 'Material Flow & Inventory Staging' },
+  { id: 'material_notes',      section: 'Material Flow',       type: 'text',   label: 'Material Flow Observations' },
+  { id: 'overall_rating',      section: 'Overall',             type: 'select', label: 'Overall Area Rating' },
+  { id: 'action_required',     section: 'Overall',             type: 'select', label: 'Immediate Action Required' },
+  { id: 'summary',             section: 'Overall',             type: 'text',   label: 'Summary & Recommendations' },
 ];
 
-// Export questions so the frontend can import them
-router.get('/questions', (req, res) => {
-  res.json(GEMBA_QUESTIONS);
-});
+const SECTIONS = [...new Set(GEMBA_QUESTIONS.map(q => q.section))];
+
+router.get('/questions', (req, res) => res.json(GEMBA_QUESTIONS));
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/gemba/sessions/open
@@ -70,7 +244,7 @@ router.get('/sessions/open', async (req, res) => {
         COUNT(DISTINCT gp.employee_id)
           FILTER (WHERE gp.submitted_at IS NOT NULL)    AS submitted_count
       FROM gemba_sessions gs
-      LEFT JOIN employees e        ON e.employee_id = gs.created_by
+      LEFT JOIN employees e           ON e.employee_id = gs.created_by
       LEFT JOIN gemba_participants gp ON gp.session_id = gs.id
       WHERE gs.status = 'OPEN'
       GROUP BY gs.id, e.name
@@ -110,7 +284,6 @@ router.get('/sessions/:id', async (req, res) => {
       WHERE gs.id = $1
       GROUP BY gs.id, e.name
     `, [req.params.id]);
-
     if (!rows.length) return res.status(404).json({ error: 'Session not found' });
     res.json(rows[0]);
   } catch (err) {
@@ -121,31 +294,22 @@ router.get('/sessions/:id', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/gemba/sessions
-// Create a new session and auto-join the creator
 // ─────────────────────────────────────────────────────────────────
 router.post('/sessions', async (req, res) => {
   try {
     const { name, department, area, created_by } = req.body;
-
     if (!name || !department || !area || !created_by) {
       return res.status(400).json({ error: 'name, department, area, and created_by are required' });
     }
-
     const { rows } = await db.query(`
       INSERT INTO gemba_sessions (name, department, area, created_by)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
+      VALUES ($1, $2, $3, $4) RETURNING *
     `, [name, department, area, created_by]);
-
     const session = rows[0];
-
-    // Auto-join the creator
     await db.query(`
       INSERT INTO gemba_participants (session_id, employee_id)
-      VALUES ($1, $2)
-      ON CONFLICT DO NOTHING
+      VALUES ($1, $2) ON CONFLICT DO NOTHING
     `, [session.id, created_by]);
-
     res.json(session);
   } catch (err) {
     console.error('Error creating gemba session:', err);
@@ -160,20 +324,13 @@ router.post('/sessions/:id/join', async (req, res) => {
   try {
     const { employee_id } = req.body;
     if (!employee_id) return res.status(400).json({ error: 'employee_id is required' });
-
-    // Check session exists and is open
-    const { rows: s } = await db.query(
-      `SELECT * FROM gemba_sessions WHERE id = $1`, [req.params.id]
-    );
+    const { rows: s } = await db.query(`SELECT * FROM gemba_sessions WHERE id = $1`, [req.params.id]);
     if (!s.length) return res.status(404).json({ error: 'Session not found' });
     if (s[0].status !== 'OPEN') return res.status(400).json({ error: 'Session is closed' });
-
     await db.query(`
       INSERT INTO gemba_participants (session_id, employee_id)
-      VALUES ($1, $2)
-      ON CONFLICT (session_id, employee_id) DO NOTHING
+      VALUES ($1, $2) ON CONFLICT (session_id, employee_id) DO NOTHING
     `, [req.params.id, employee_id]);
-
     res.json({ success: true });
   } catch (err) {
     console.error('Error joining gemba session:', err);
@@ -183,31 +340,22 @@ router.post('/sessions/:id/join', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/gemba/sessions/:id/submit
-// Submit answers for this participant
-// Body: { employee_id, answers: { questionId: value, ... } }
 // ─────────────────────────────────────────────────────────────────
 router.post('/sessions/:id/submit', async (req, res) => {
   try {
     const { employee_id, answers } = req.body;
     if (!employee_id) return res.status(400).json({ error: 'employee_id is required' });
-
     const sessionId = req.params.id;
-
-    // Upsert submission
     await db.query(`
       INSERT INTO gemba_submissions (session_id, employee_id, answers)
       VALUES ($1, $2, $3)
       ON CONFLICT (session_id, employee_id)
       DO UPDATE SET answers = $3, submitted_at = NOW()
     `, [sessionId, employee_id, JSON.stringify(answers)]);
-
-    // Mark participant as submitted
     await db.query(`
-      UPDATE gemba_participants
-      SET submitted_at = NOW()
+      UPDATE gemba_participants SET submitted_at = NOW()
       WHERE session_id = $1 AND employee_id = $2
     `, [sessionId, employee_id]);
-
     res.json({ success: true });
   } catch (err) {
     console.error('Error submitting gemba answers:', err);
@@ -217,28 +365,21 @@ router.post('/sessions/:id/submit', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/gemba/sessions/:id/photos
-// Upload a photo for a submission
-// Multipart field: "photo", body: { employee_id }
 // ─────────────────────────────────────────────────────────────────
 router.post('/sessions/:id/photos', uploadPhotos.single('photo'), async (req, res) => {
   try {
     const sessionId  = req.params.id;
     const employeeId = req.body.employee_id;
-
-    if (!req.file)    return res.status(400).json({ error: 'No photo file provided' });
-    if (!employeeId)  return res.status(400).json({ error: 'employee_id is required' });
-
+    if (!req.file)   return res.status(400).json({ error: 'No photo file provided' });
+    if (!employeeId) return res.status(400).json({ error: 'employee_id is required' });
     const photoUrl = `/files/${req.file.filename}`;
     const photo    = { url: photoUrl, name: req.file.originalname, size: req.file.size };
-
-    // Append to submission photos array
     await db.query(`
       INSERT INTO gemba_submissions (session_id, employee_id, photos)
       VALUES ($1, $2, $3::jsonb)
       ON CONFLICT (session_id, employee_id)
       DO UPDATE SET photos = gemba_submissions.photos || $3::jsonb
     `, [sessionId, employeeId, JSON.stringify([photo])]);
-
     res.json({ photo });
   } catch (err) {
     console.error('Error uploading gemba photo:', err);
@@ -248,66 +389,53 @@ router.post('/sessions/:id/photos', uploadPhotos.single('photo'), async (req, re
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/gemba/sessions/:id/close
-// Close session, generate PDF, store in document library
-// under Restricted Access > GEMBA subfolder
 // ─────────────────────────────────────────────────────────────────
 router.post('/sessions/:id/close', async (req, res) => {
   try {
     const sessionId = req.params.id;
 
-    // Load session
-    const { rows: sessions } = await db.query(
-      `SELECT gs.*, e.name AS created_by_name
-       FROM gemba_sessions gs
-       LEFT JOIN employees e ON e.employee_id = gs.created_by
-       WHERE gs.id = $1`, [sessionId]
-    );
+    const { rows: sessions } = await db.query(`
+      SELECT gs.*, e.name AS created_by_name
+      FROM gemba_sessions gs
+      LEFT JOIN employees e ON e.employee_id = gs.created_by
+      WHERE gs.id = $1
+    `, [sessionId]);
     if (!sessions.length) return res.status(404).json({ error: 'Session not found' });
     const session = sessions[0];
     if (session.status === 'CLOSED') return res.status(400).json({ error: 'Already closed' });
 
-    // Load all participants with names
     const { rows: participants } = await db.query(`
       SELECT gp.*, e.name, e.department AS emp_dept
       FROM gemba_participants gp
       JOIN employees e ON e.employee_id = gp.employee_id
-      WHERE gp.session_id = $1
-      ORDER BY gp.joined_at
+      WHERE gp.session_id = $1 ORDER BY gp.joined_at
     `, [sessionId]);
 
-    // Load all submissions
     const { rows: submissions } = await db.query(`
       SELECT gs.*, e.name AS submitter_name
       FROM gemba_submissions gs
       JOIN employees e ON e.employee_id = gs.employee_id
-      WHERE gs.session_id = $1
-      ORDER BY gs.submitted_at
+      WHERE gs.session_id = $1 ORDER BY gs.submitted_at
     `, [sessionId]);
 
-    // ── FIND OR CREATE GEMBA SUBFOLDER ──────────────────────────
-    // Find "Restricted Access" top-level folder
+    // ── FIND OR CREATE GEMBA SUBFOLDER ───────────────────────────
     const { rows: restrictedFolders } = await db.query(
       `SELECT id FROM document_folders WHERE parent_folder_id IS NULL AND name ILIKE '%restricted%' LIMIT 1`
     );
 
     let gembaFolderId = null;
-
     if (restrictedFolders.length) {
       const restrictedId = restrictedFolders[0].id;
-
-      // Find or create GEMBA subfolder
       const { rows: existing } = await db.query(
         `SELECT id FROM document_folders WHERE parent_folder_id = $1 AND name = 'GEMBA' LIMIT 1`,
         [restrictedId]
       );
-
       if (existing.length) {
         gembaFolderId = existing[0].id;
       } else {
         const { rows: created } = await db.query(
           `INSERT INTO document_folders (name, description, parent_folder_id, created_by)
-           VALUES ('GEMBA', 'Leadership Gemba Walk Reports', $1, $2)
-           RETURNING id`,
+           VALUES ('GEMBA', 'Leadership Gemba Walk Reports', $1, $2) RETURNING id`,
           [restrictedId, session.created_by]
         );
         gembaFolderId = created[0].id;
@@ -315,149 +443,203 @@ router.post('/sessions/:id/close', async (req, res) => {
     }
 
     // ── GENERATE PDF ─────────────────────────────────────────────
-    const timestamp  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const pdfName    = `GEMBA_${session.department}_${timestamp}.pdf`;
-    const pdfDir     = '/data/documents';
-    const pdfPath    = path.join(pdfDir, pdfName);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const pdfName   = `GEMBA_${session.department}_${timestamp}.pdf`;
+    const pdfDir    = '/data/documents';
+    const pdfPath   = path.join(pdfDir, pdfName);
 
     if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
 
     if (PDFDocument) {
       await new Promise((resolve, reject) => {
-        const doc  = new PDFDocument({ margin: 50, size: 'A4' });
+        const doc = new PDFDocument({
+          size: 'LETTER',
+          margins: { top: 0, right: 0, bottom: 0, left: 0 },
+          autoFirstPage: true,
+          bufferPages: true,
+          info: {
+            Title:   `Gemba Walk – ${session.department} – ${session.area}`,
+            Author:  session.created_by_name || 'Dal-Tile',
+            Subject: 'Leadership Gemba Walk Report',
+            Creator: 'Dal-Tile Safety App',
+          },
+        });
+
         const stream = fs.createWriteStream(pdfPath);
         doc.pipe(stream);
 
-        const RED    = '#B30000';
-        const DARK   = '#1a1a1a';
-        const GRAY   = '#555555';
-        const LIGHT  = '#f5f5f5';
+        // ── PAGE 1 ────────────────────────────────────────────────
+        let y = drawHeader(doc, session.department, session.area);
+        drawFooter(doc);
 
-        // ── HEADER ──
-        doc.rect(0, 0, doc.page.width, 80).fill(DARK);
-        doc.fillColor('white').fontSize(22).font('Helvetica-Bold')
-           .text('LEADERSHIP GEMBA WALK REPORT', 50, 20);
-        doc.fontSize(11).fillColor('#cccccc')
-           .text(`${session.department}  ·  ${session.area}`, 50, 50);
+        // Status banner
+        const anyIssues = submissions.some(sub =>
+          Object.values(sub.answers || {}).some(v =>
+            ['Non-Compliant','Severe','Blocked','Down','Critical','Yes - Critical','Yes - Moderate'].includes(v)
+          )
+        );
+        const bannerColor = anyIssues ? COLOR.issue : COLOR.good;
+        const bannerBg    = anyIssues ? COLOR.issueBg : COLOR.goodBg;
+        const bannerLabel = anyIssues ? 'ACTION REQUIRED' : 'SESSION COMPLETE';
 
-        // Red accent line
-        doc.rect(0, 80, doc.page.width, 4).fill(RED);
+        doc.rect(MARGIN, y, CONTENT, 36).fill(bannerBg);
+        doc.font(FONT.bold).fontSize(13).fillColor(bannerColor)
+           .text(bannerLabel, MARGIN + 12, y + 10);
 
-        doc.moveDown(2);
+        const subLabel = `${submissions.length} of ${participants.length} submitted`;
+        const subW = doc.widthOfString(subLabel, { fontSize: 8 }) + 16;
+        const subX = PAGE_W - MARGIN - subW;
+        doc.roundedRect(subX, y + 9, subW, 16, 3).fill(COLOR.naBg);
+        doc.font(FONT.bold).fontSize(8).fillColor(COLOR.na)
+           .text(subLabel, subX, y + 13, { width: subW, align: 'center' });
 
-        // ── SESSION INFO ──
-        doc.fillColor(DARK).fontSize(12).font('Helvetica-Bold').text('SESSION INFORMATION', { underline: false });
-        doc.rect(50, doc.y, doc.page.width - 100, 1).fill(RED);
-        doc.moveDown(0.5);
+        y += 48;
 
-        const info = [
-          ['Session Name',   session.name],
-          ['Department',     session.department],
-          ['Area',           session.area],
-          ['Created By',     session.created_by_name || `ID: ${session.created_by}`],
-          ['Created At',     new Date(session.created_at).toLocaleString()],
-          ['Closed At',      new Date().toLocaleString()],
-          ['Participants',   `${submissions.length} of ${participants.length} submitted`],
-        ];
+        // Metadata grid — row 1
+        doc.rect(MARGIN, y, CONTENT, 72).fill(COLOR.lightGray).stroke(COLOR.border);
+        const col   = CONTENT / 4;
+        const mY1   = y + 10;
+        metaRow(doc, 'Session Name', session.name,                                      MARGIN + 10,           mY1, col - 10);
+        metaRow(doc, 'Department',   session.department,                                MARGIN + 10 + col,     mY1, col - 10);
+        metaRow(doc, 'Area',         session.area,                                      MARGIN + 10 + col * 2, mY1, col - 10);
+        metaRow(doc, 'Created By',   session.created_by_name || session.created_by,    MARGIN + 10 + col * 3, mY1, col - 10);
+        y += 84;
 
-        info.forEach(([label, value]) => {
-          doc.fontSize(10).font('Helvetica-Bold').fillColor(GRAY).text(`${label}: `, { continued: true });
-          doc.font('Helvetica').fillColor(DARK).text(value || '—');
+        // Metadata grid — row 2
+        doc.rect(MARGIN, y, CONTENT, 52).fill(COLOR.lightGray).stroke(COLOR.border);
+        const mY2 = y + 10;
+        metaRow(doc, 'Created At', new Date(session.created_at).toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' }), MARGIN + 10,       mY2, col - 10);
+        metaRow(doc, 'Closed At',  new Date().toLocaleString('en-US',               { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' }), MARGIN + 10 + col, mY2, col - 10);
+        y += 64;
+
+        // ── PARTICIPANTS ──────────────────────────────────────────
+        y = sectionBar(doc, 'Participants', y, session.department, session.area);
+
+        participants.forEach((p, i) => {
+          const submitted   = submissions.find(s => String(s.employee_id) === String(p.employee_id));
+          const statusLabel = submitted ? '✓  Submitted' : '○  Not Submitted';
+          const meta        = submitted
+            ? { color: COLOR.good,  bg: COLOR.goodBg  }
+            : { color: COLOR.issue, bg: COLOR.issueBg };
+          const ROW_H = 22;
+
+          if (y + ROW_H > PAGE_H - 60) {
+            doc.addPage();
+            drawHeader(doc, session.department, session.area);
+            drawFooter(doc);
+            y = 88;
+          }
+
+          if (i % 2 === 0) doc.rect(MARGIN, y, CONTENT, ROW_H).fill(COLOR.lightGray);
+
+          doc.font(FONT.regular).fontSize(10).fillColor(COLOR.charcoal)
+             .text(p.name, MARGIN + 8, y + 5, { width: CONTENT / 2 });
+
+          const badgeW = 120;
+          const badgeX = PAGE_W - MARGIN - badgeW;
+          doc.roundedRect(badgeX, y + 3, badgeW, 16, 3).fill(meta.bg);
+          doc.font(FONT.bold).fontSize(8).fillColor(meta.color)
+             .text(statusLabel, badgeX, y + 6, { width: badgeW, align: 'center' });
+
+          if (submitted) {
+            doc.font(FONT.regular).fontSize(8).fillColor(COLOR.midGray)
+               .text(
+                 new Date(submitted.submitted_at).toLocaleString('en-US', { timeZone: 'America/Chicago', timeStyle: 'short', dateStyle: 'short' }),
+                 MARGIN + CONTENT / 2, y + 6,
+                 { width: CONTENT / 2 - badgeW - 16, align: 'right' }
+               );
+          }
+
+          y += ROW_H;
         });
 
-        doc.moveDown(1);
+        y += 12;
 
-        // ── PARTICIPANT LIST ──
-        doc.fontSize(12).font('Helvetica-Bold').fillColor(DARK).text('PARTICIPANTS');
-        doc.rect(50, doc.y, doc.page.width - 100, 1).fill(RED);
-        doc.moveDown(0.5);
+        // ── SUBMISSIONS ───────────────────────────────────────────
+        submissions.forEach(sub => {
+          if (y + 40 > PAGE_H - 60) {
+            doc.addPage();
+            drawHeader(doc, session.department, session.area);
+            drawFooter(doc);
+            y = 88;
+          }
 
-        participants.forEach(p => {
-          const submitted = submissions.find(s => String(s.employee_id) === String(p.employee_id));
-          const status = submitted ? '✓ Submitted' : '○ Not Submitted';
-          const color  = submitted ? '#1a7a40' : '#B30000';
-          doc.fontSize(10).font('Helvetica').fillColor(color)
-             .text(`${status}  `, { continued: true })
-             .fillColor(DARK).text(`${p.name}`);
-        });
-
-        doc.moveDown(1.5);
-
-        // ── SUBMISSIONS ──
-        const sections = [...new Set(GEMBA_QUESTIONS.map(q => q.section))];
-
-        submissions.forEach((sub, si) => {
-          if (doc.y > doc.page.height - 150) doc.addPage();
-
-          // Submitter header
-          doc.rect(50, doc.y, doc.page.width - 100, 28).fill(DARK);
-          doc.fillColor('white').fontSize(12).font('Helvetica-Bold')
-             .text(`  ${sub.submitter_name || `Employee ${sub.employee_id}`}`, 54, doc.y - 22);
-          doc.fillColor('#aaa').fontSize(9)
-             .text(`  Submitted: ${new Date(sub.submitted_at).toLocaleString()}`, 54, doc.y - 2);
-          doc.moveDown(1);
+          // Dark submitter bar
+          doc.rect(MARGIN, y, CONTENT, 30).fill(COLOR.charcoal);
+          doc.font(FONT.bold).fontSize(12).fillColor(COLOR.white)
+             .text(sub.submitter_name || `Employee ${sub.employee_id}`, MARGIN + 10, y + 6);
+          doc.font(FONT.regular).fontSize(8).fillColor('rgba(255,255,255,0.65)')
+             .text(
+               `Submitted: ${new Date(sub.submitted_at).toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' })}`,
+               MARGIN + 10, y + 19
+             );
+          y += 38;
 
           const answers = sub.answers || {};
 
-          sections.forEach(section => {
-            const sectionQs = GEMBA_QUESTIONS.filter(q => q.section === section);
+          SECTIONS.forEach(section => {
+            const sectionQs  = GEMBA_QUESTIONS.filter(q => q.section === section);
             const hasAnswers = sectionQs.some(q => answers[q.id]);
             if (!hasAnswers) return;
 
-            // Section subheader
-            doc.fontSize(11).font('Helvetica-Bold').fillColor(RED).text(section.toUpperCase());
-            doc.rect(50, doc.y, doc.page.width - 100, 0.5).fill('#dddddd');
-            doc.moveDown(0.4);
+            y = sectionBar(doc, section, y, session.department, session.area);
 
+            let rowIndex = 0;
             sectionQs.forEach(q => {
               const val = answers[q.id];
               if (!val) return;
-              doc.fontSize(9).font('Helvetica-Bold').fillColor(GRAY)
-                 .text(`${q.label}: `, { continued: true });
-              doc.font('Helvetica').fillColor(DARK).text(val);
+              if (q.type === 'select') {
+                y = answerRow(doc, q.label, val, y, session.department, session.area, rowIndex);
+                rowIndex++;
+              } else {
+                y = textRow(doc, q.label, val, y, session.department, session.area);
+              }
             });
 
-            doc.moveDown(0.5);
+            y += 6;
           });
 
           // Photos
           if (sub.photos && sub.photos.length > 0) {
-            doc.fontSize(10).font('Helvetica-Bold').fillColor(DARK)
-               .text(`Photos: ${sub.photos.length} attached`);
+            y = sectionBar(doc, `Photos — ${sub.submitter_name}`, y, session.department, session.area);
+
             sub.photos.forEach((p, pi) => {
               const fullPath = path.join('/data/uploads', path.basename(p.url));
-              if (fs.existsSync(fullPath)) {
-                try {
-                  if (doc.y > doc.page.height - 200) doc.addPage();
-                  doc.image(fullPath, { width: 200, align: 'left' });
-                  doc.fontSize(8).fillColor(GRAY).text(p.name || `Photo ${pi + 1}`);
-                  doc.moveDown(0.5);
-                } catch (imgErr) {
-                  doc.fontSize(8).fillColor(GRAY).text(`[Photo: ${p.name}]`);
-                }
+              if (!fs.existsSync(fullPath)) return;
+              const PHOTO_H = 220;
+              if (y + PHOTO_H + 20 > PAGE_H - 60) {
+                doc.addPage();
+                drawHeader(doc, session.department, session.area);
+                drawFooter(doc);
+                y = 88;
+              }
+              try {
+                const maxW = 420;
+                doc.image(fullPath, (PAGE_W - maxW) / 2, y, { fit: [maxW, PHOTO_H], align: 'center', valign: 'top' });
+                doc.rect((PAGE_W - maxW) / 2, y, maxW, PHOTO_H).lineWidth(1).stroke(COLOR.border);
+                doc.font(FONT.oblique).fontSize(8).fillColor(COLOR.midGray)
+                   .text(p.name || `Photo ${pi + 1}`, MARGIN, y + PHOTO_H + 4, { align: 'center', width: CONTENT });
+                y += PHOTO_H + 18;
+              } catch (_) {
+                doc.font(FONT.oblique).fontSize(9).fillColor(COLOR.midGray)
+                   .text(`[Photo: ${p.name}]`, MARGIN, y + 4);
+                y += 20;
               }
             });
           }
 
-          doc.moveDown(1.5);
+          y += 16;
         });
 
-        // ── FOOTER ──
-        doc.rect(0, doc.page.height - 40, doc.page.width, 40).fill(DARK);
-        doc.fillColor('#888').fontSize(8).font('Helvetica')
-           .text(
-             `Dal-Tile Muskogee  ·  GEMBA Walk Report  ·  Generated ${new Date().toLocaleString()}`,
-             50, doc.page.height - 25, { align: 'center' }
-           );
-
+        doc.flushPages();
         doc.end();
         stream.on('finish', resolve);
         stream.on('error', reject);
       });
     } else {
-      // Fallback: write a plain text file if pdfkit not installed
+      // Fallback plain text
       const txt = [
-        `GEMBA WALK REPORT`,
+        'GEMBA WALK REPORT',
         `Session: ${session.name}`,
         `Department: ${session.department} | Area: ${session.area}`,
         `Created: ${session.created_at} | Closed: ${new Date().toISOString()}`,
@@ -471,35 +653,31 @@ router.post('/sessions/:id/close', async (req, res) => {
       fs.writeFileSync(pdfPath.replace('.pdf', '.txt'), txt);
     }
 
-    // ── STORE IN DOCUMENT LIBRARY ────────────────────────────────
+    // ── STORE IN DOCUMENT LIBRARY ─────────────────────────────────
     let docId = null;
     if (gembaFolderId) {
       try {
         const { rows: docRows } = await db.query(`
           INSERT INTO documents (folder_id, title, description, created_by)
-          VALUES ($1, $2, $3, $4)
-          RETURNING id
+          VALUES ($1, $2, $3, $4) RETURNING id
         `, [
           gembaFolderId,
           `GEMBA Walk — ${session.department} — ${new Date().toLocaleDateString()}`,
           `${session.name} | ${session.area} | ${submissions.length}/${participants.length} submissions`,
           session.created_by,
         ]);
-
         docId = docRows[0].id;
 
-        // Create version record pointing to the PDF
         await db.query(`
           INSERT INTO document_versions (document_id, version_number, file_path, file_type, uploaded_by, change_comment)
           VALUES ($1, 1, $2, 'application/pdf', $3, 'Auto-generated from GEMBA Walk session')
         `, [docId, `/data/documents/${pdfName}`, session.created_by]);
       } catch (docErr) {
         console.error('Error storing PDF in document library:', docErr);
-        // Non-fatal — session still closes
       }
     }
 
-    // ── CLOSE SESSION ────────────────────────────────────────────
+    // ── CLOSE SESSION ─────────────────────────────────────────────
     await db.query(`
       UPDATE gemba_sessions
       SET status = 'CLOSED', closed_at = NOW(), pdf_path = $1, document_id = $2
@@ -515,7 +693,6 @@ router.post('/sessions/:id/close', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/gemba/sessions/:id/submission/:employeeId
-// Get this participant's current submission (for resume/review)
 // ─────────────────────────────────────────────────────────────────
 router.get('/sessions/:id/submission/:employeeId', async (req, res) => {
   try {
@@ -523,7 +700,6 @@ router.get('/sessions/:id/submission/:employeeId', async (req, res) => {
       SELECT * FROM gemba_submissions
       WHERE session_id = $1 AND employee_id = $2
     `, [req.params.id, req.params.employeeId]);
-
     res.json(rows[0] || null);
   } catch (err) {
     console.error('Error fetching submission:', err);
