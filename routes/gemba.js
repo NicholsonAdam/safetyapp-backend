@@ -492,7 +492,7 @@ router.post('/sessions/:id/close', async (req, res) => {
         await db.query(`
           INSERT INTO document_versions (document_id, version_number, file_path, file_type, uploaded_by, change_comment)
           VALUES ($1, 1, $2, 'application/pdf', $3, 'Auto-generated from GEMBA Walk session')
-        `, [docId, `/api/data/documents/${pdfName}`, session.created_by]);
+        `, [docId, `/data/documents/${pdfName}`, session.created_by]);
       } catch (docErr) {
         console.error('Error storing PDF in document library:', docErr);
         // Non-fatal — session still closes
