@@ -79,6 +79,10 @@ app.use("/api/nearmiss",                        require("./routes/nearmiss"));
 app.use("/api/inspection",                      require("./routes/inspection"));
 app.use('/api/submission-requirements',         require('./routes/submissionRequirements'));
 app.use("/api/folders",                         documentFoldersRoutes);
+
+// Serve GEMBA PDFs before the documents router intercepts the request
+app.use("/api/documents/GEMBA",                 express.static("/data/documents"));
+
 app.use("/api/documents",                       documentsRoutes);
 app.use("/api/documentVersions",                documentVersionsRoutes);
 app.use("/api/signatures",                      require("./routes/signatureUpload"));
