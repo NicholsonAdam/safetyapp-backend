@@ -287,7 +287,7 @@ router.post('/sessions/:id/close', async (req, res) => {
     // ── FIND OR CREATE GEMBA SUBFOLDER ──────────────────────────
     // Find "Restricted Access" top-level folder
     const { rows: restrictedFolders } = await db.query(
-      `SELECT id FROM folders WHERE parent_folder_id IS NULL AND name ILIKE '%restricted%' LIMIT 1`
+      `SELECT id FROM document_folders WHERE parent_folder_id IS NULL AND name ILIKE '%restricted%' LIMIT 1`
     );
 
     let gembaFolderId = null;
@@ -297,7 +297,7 @@ router.post('/sessions/:id/close', async (req, res) => {
 
       // Find or create GEMBA subfolder
       const { rows: existing } = await db.query(
-        `SELECT id FROM folders WHERE parent_folder_id = $1 AND name = 'GEMBA' LIMIT 1`,
+        `SELECT id FROM document_folders WHERE parent_folder_id = $1 AND name = 'GEMBA' LIMIT 1`,
         [restrictedId]
       );
 
@@ -305,7 +305,7 @@ router.post('/sessions/:id/close', async (req, res) => {
         gembaFolderId = existing[0].id;
       } else {
         const { rows: created } = await db.query(
-          `INSERT INTO folders (name, description, parent_folder_id, created_by)
+          `INSERT INTO document_folders (name, description, parent_folder_id, created_by)
            VALUES ('GEMBA', 'Leadership Gemba Walk Reports', $1, $2)
            RETURNING id`,
           [restrictedId, session.created_by]
