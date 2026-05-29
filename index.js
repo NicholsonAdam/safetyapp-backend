@@ -58,7 +58,17 @@ const documentSignatureRequirementsRoutes       = require("./routes/documentSign
 try {
   require('./cron/submissionRequirementsCron');
 } catch (err) {
-  console.error("Failed to load cron job:", err);
+  console.error("Failed to load submissionRequirementsCron:", err);
+}
+try {
+  require('./cron/trainingExpiryCron');
+} catch (err) {
+  console.error("Failed to load trainingExpiryCron:", err);
+}
+try {
+  require('./cron/fridaySubmissionReportCron');
+} catch (err) {
+  console.error("Failed to load fridaySubmissionReportCron:", err);
 }
 
 const PORT = process.env.PORT || 3000;
@@ -100,6 +110,8 @@ app.use("/api/forms/ladder-inspection",         require("./routes/forms/ladderIn
 app.use("/api/forms/housekeeping-inspection",   require("./routes/forms/housekeepingInspection"));
 app.use('/api/gemba', require('./routes/gemba'));
 app.use('/api/incidents', require('./routes/incidents'));
+app.use('/api/training-registry', require('./routes/trainingRegistry'));
+app.use('/api/admin',            require('./routes/adminCronTrigger'));
 
 // GENERIC /api ROUTES LAST
 app.use('/api',                                 healthcheckRoute);
