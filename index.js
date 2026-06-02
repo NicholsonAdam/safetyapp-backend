@@ -108,6 +108,7 @@ app.use("/api/leader/signatures",               require("./routes/leaderSignatur
 app.use("/api/forms/rack-inspection",           require("./routes/forms/rackInspection"));
 app.use("/api/forms/ladder-inspection",         require("./routes/forms/ladderInspection"));
 app.use("/api/forms/housekeeping-inspection",   require("./routes/forms/housekeepingInspection"));
+app.use("/api/forms/awp-loto-evaluation", require("./routes/forms/awpLotoEvaluation"));
 app.use('/api/gemba', require('./routes/gemba'));
 app.use('/api/incidents', require('./routes/incidents'));
 app.use('/api/training-registry', require('./routes/trainingRegistry'));
