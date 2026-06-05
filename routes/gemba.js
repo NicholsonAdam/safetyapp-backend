@@ -5,11 +5,9 @@ const path     = require('path');
 const fs       = require('fs');
 const { uploadPhotos } = require('../middleware/upload');
 
-// ─── PDF GENERATION ──────────────────────────────────────────────
 let PDFDocument;
 try { PDFDocument = require('pdfkit'); } catch (e) { PDFDocument = null; }
 
-// ─── Brand tokens (matches housekeeping inspection) ───────────────
 const COLOR = {
   red:       '#B30000',
   redDark:   '#7A0000',
@@ -28,78 +26,18 @@ const COLOR = {
   na:        '#5A5A5A',
   naBg:      '#F0F0F0',
 };
+const FONT   = { regular: 'Helvetica', bold: 'Helvetica-Bold', oblique: 'Helvetica-Oblique' };
+const PAGE_W = 612, PAGE_H = 792, MARGIN = 40, CONTENT = PAGE_W - MARGIN * 2;
 
-const FONT = {
-  regular: 'Helvetica',
-  bold:    'Helvetica-Bold',
-  oblique: 'Helvetica-Oblique',
-};
-
-const PAGE_W  = 612;
-const PAGE_H  = 792;
-const MARGIN  = 40;
-const CONTENT = PAGE_W - MARGIN * 2;
-
-// ─── Answer badge colours ─────────────────────────────────────────
-const ANSWER_META = {
-  'Compliant':          { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Excellent':          { color: COLOR.good,  bg: COLOR.goodBg  },
-  'None':               { color: COLOR.good,  bg: COLOR.goodBg  },
-  'All Present':        { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Clear':              { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Running':            { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Good':               { color: COLOR.good,  bg: COLOR.goodBg  },
-  'High':               { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Yes':                { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Optimal':            { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Fully Staffed':      { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Current':            { color: COLOR.good,  bg: COLOR.goodBg  },
-  'Minor Issues':       { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Acceptable':         { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Minor':              { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Some Missing':       { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Partially Blocked':  { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Low':                { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Fair':               { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Moderate':           { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Mostly':             { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Overdue':            { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Partially':          { color: COLOR.warn,  bg: COLOR.warnBg  },
-  '1 Short':            { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Yes - Minor':        { color: COLOR.warn,  bg: COLOR.warnBg  },
-  'Non-Compliant':      { color: COLOR.issue, bg: COLOR.issueBg },
-  'Needs Attention':    { color: COLOR.issue, bg: COLOR.issueBg },
-  'Severe':             { color: COLOR.issue, bg: COLOR.issueBg },
-  'Needs Update':       { color: COLOR.issue, bg: COLOR.issueBg },
-  'Blocked':            { color: COLOR.issue, bg: COLOR.issueBg },
-  'Not Present':        { color: COLOR.issue, bg: COLOR.issueBg },
-  'Down':               { color: COLOR.issue, bg: COLOR.issueBg },
-  '2+ Short':           { color: COLOR.issue, bg: COLOR.issueBg },
-  'Poor':               { color: COLOR.issue, bg: COLOR.issueBg },
-  'Disengaged':         { color: COLOR.issue, bg: COLOR.issueBg },
-  'No':                 { color: COLOR.issue, bg: COLOR.issueBg },
-  'Critical':           { color: COLOR.issue, bg: COLOR.issueBg },
-  'Shortage':           { color: COLOR.issue, bg: COLOR.issueBg },
-  'Yes - Moderate':     { color: COLOR.issue, bg: COLOR.issueBg },
-  'Yes - Critical':     { color: COLOR.issue, bg: COLOR.issueBg },
-};
-
-const getAnswerMeta = val => ANSWER_META[val] || { color: COLOR.na, bg: COLOR.naBg };
-
-// ─── Layout helpers ───────────────────────────────────────────────
 function drawHeader(doc, department, area) {
   doc.rect(0, 0, PAGE_W, 72).fill(COLOR.red);
-
   const LOGO_PATH = path.join(__dirname, '..', 'public', 'logo.jpg');
   let logoRight = MARGIN;
   try { doc.image(LOGO_PATH, MARGIN, 14, { height: 44 }); logoRight = MARGIN + 60; } catch (_) {}
-
   doc.fillColor(COLOR.white).font(FONT.bold).fontSize(15)
      .text('  DAL-TILE  ·  MUSKOGEE', logoRight + 12, 16, { lineBreak: false });
-
   doc.font(FONT.regular).fontSize(10).fillColor('rgba(255,255,255,0.80)')
      .text('  Leadership Gemba Walk Report', logoRight + 12, 36, { lineBreak: false });
-
   if (department) {
     const pillLabel = `${department}  ·  ${area || ''}`;
     const pillW = doc.widthOfString(pillLabel, { fontSize: 10 }) + 24;
@@ -108,7 +46,6 @@ function drawHeader(doc, department, area) {
     doc.font(FONT.bold).fontSize(10).fillColor(COLOR.white)
        .text(pillLabel, pillX, 31, { width: pillW, align: 'center', lineBreak: false });
   }
-
   doc.fillColor(COLOR.charcoal);
   return 84;
 }
@@ -136,10 +73,7 @@ function metaRow(doc, label, value, x, y, colW) {
 function sectionBar(doc, title, y, department, area) {
   const BAR_H = 24;
   if (y + BAR_H + 40 > PAGE_H - 60) {
-    doc.addPage();
-    drawHeader(doc, department, area);
-    drawFooter(doc);
-    y = 88;
+    doc.addPage(); drawHeader(doc, department, area); drawFooter(doc); y = 88;
   }
   doc.rect(MARGIN, y, CONTENT, BAR_H).fill(COLOR.red);
   doc.font(FONT.bold).fontSize(10).fillColor(COLOR.white)
@@ -147,89 +81,6 @@ function sectionBar(doc, title, y, department, area) {
   doc.fillColor(COLOR.charcoal);
   return y + BAR_H + 8;
 }
-
-function answerRow(doc, question, value, y, department, area, rowIndex) {
-  const ROW_H   = 22;
-  const BADGE_W = 130;
-  const Q_W     = CONTENT - BADGE_W - 12;
-
-  if (y + ROW_H > PAGE_H - 60) {
-    doc.addPage();
-    drawHeader(doc, department, area);
-    drawFooter(doc);
-    y = 88;
-  }
-
-  const meta = getAnswerMeta(value);
-  if (rowIndex % 2 === 0) doc.rect(MARGIN, y, CONTENT, ROW_H).fill(COLOR.lightGray);
-
-  doc.font(FONT.regular).fontSize(9.5).fillColor(COLOR.charcoal)
-     .text(question, MARGIN + 8, y + 5, { width: Q_W });
-
-  const badgeX = MARGIN + Q_W + 12;
-  doc.roundedRect(badgeX, y + 3, BADGE_W, 16, 3).fill(meta.bg);
-  doc.font(FONT.bold).fontSize(8).fillColor(meta.color)
-     .text(value, badgeX, y + 6, { width: BADGE_W, align: 'center' });
-
-  return y + ROW_H;
-}
-
-function textRow(doc, question, value, y, department, area) {
-  if (!value || !value.trim()) return y;
-
-  const textH = Math.max(
-    doc.heightOfString(value.trim(), { width: CONTENT - 20, font: FONT.regular, fontSize: 9.5 }) + 16,
-    28
-  );
-
-  if (y + textH > PAGE_H - 60) {
-    doc.addPage();
-    drawHeader(doc, department, area);
-    drawFooter(doc);
-    y = 88;
-  }
-
-  doc.rect(MARGIN, y, CONTENT, textH).fill(COLOR.lightGray);
-  doc.font(FONT.bold).fontSize(8).fillColor(COLOR.midGray)
-     .text(question.toUpperCase(), MARGIN + 8, y + 5, { width: CONTENT - 16 });
-  doc.font(FONT.regular).fontSize(9.5).fillColor(COLOR.charcoal)
-     .text(value.trim(), MARGIN + 8, y + 15, { width: CONTENT - 16 });
-
-  return y + textH + 4;
-}
-
-// ─── GEMBA QUESTIONS ─────────────────────────────────────────────
-const GEMBA_QUESTIONS = [
-  { id: 'ppe_compliance',      section: 'Safety',              type: 'select', label: 'PPE Compliance' },
-  { id: 'housekeeping',        section: 'Safety',              type: 'select', label: 'Housekeeping & 5S Condition' },
-  { id: 'hazards_present',     section: 'Safety',              type: 'select', label: 'Visible Hazards Present' },
-  { id: 'safety_signage',      section: 'Safety',              type: 'select', label: 'Safety Signage & Labels' },
-  { id: 'emergency_access',    section: 'Safety',              type: 'select', label: 'Emergency Exits / Equipment Access' },
-  { id: 'safety_observations', section: 'Safety',              type: 'text',   label: 'Safety Observations & Concerns' },
-  { id: 'defect_visible',      section: 'Quality',             type: 'select', label: 'Visible Defects / Rework' },
-  { id: 'process_followed',    section: 'Quality',             type: 'select', label: 'Standard Work / Process Being Followed' },
-  { id: 'quality_controls',    section: 'Quality',             type: 'select', label: 'Quality Controls in Place' },
-  { id: 'quality_observations',section: 'Quality',             type: 'text',   label: 'Quality Observations & Concerns' },
-  { id: 'line_running',        section: 'Productivity',        type: 'select', label: 'Line / Equipment Running Status' },
-  { id: 'staffing_level',      section: 'Productivity',        type: 'select', label: 'Staffing Level vs Plan' },
-  { id: 'bottleneck',          section: 'Productivity',        type: 'select', label: 'Bottleneck / Constraint Visible' },
-  { id: 'productivity_notes',  section: 'Productivity',        type: 'text',   label: 'Productivity Observations & Notes' },
-  { id: 'employee_engagement', section: 'People & Engagement', type: 'select', label: 'Employee Engagement Level' },
-  { id: 'operator_feedback',   section: 'People & Engagement', type: 'text',   label: 'Operator / Team Member Feedback' },
-  { id: 'training_adequate',   section: 'People & Engagement', type: 'select', label: 'Training Appears Adequate' },
-  { id: 'equipment_condition', section: 'Equipment',           type: 'select', label: 'Equipment / Tooling Condition' },
-  { id: 'maintenance_issues',  section: 'Equipment',           type: 'text',   label: 'Maintenance Issues Observed' },
-  { id: 'lubrication_clean',   section: 'Equipment',           type: 'select', label: 'Lubrication / Cleaning Status' },
-  { id: 'material_flow',       section: 'Material Flow',       type: 'select', label: 'Material Flow & Inventory Staging' },
-  { id: 'material_notes',      section: 'Material Flow',       type: 'text',   label: 'Material Flow Observations' },
-  { id: 'overall_rating',      section: 'Overall',             type: 'select', label: 'Overall Area Rating' },
-  { id: 'action_required',     section: 'Overall',             type: 'select', label: 'Immediate Action Required' },
-  { id: 'summary',             section: 'Overall',             type: 'text',   label: 'Summary & Recommendations' },
-];
-
-const SECTIONS = [...new Set(GEMBA_QUESTIONS.map(q => q.section))];
-
-router.get('/questions', (req, res) => res.json(GEMBA_QUESTIONS));
 
 // ─────────────────────────────────────────────────────────────────
 // GET /api/gemba/sessions/open
@@ -242,7 +93,17 @@ router.get('/sessions/open', async (req, res) => {
         e.name                                          AS created_by_name,
         COUNT(DISTINCT gp.employee_id)                  AS participant_count,
         COUNT(DISTINCT gp.employee_id)
-          FILTER (WHERE gp.submitted_at IS NOT NULL)    AS submitted_count
+          FILTER (WHERE gp.submitted_at IS NOT NULL)    AS submitted_count,
+        (
+          SELECT json_agg(gph_agg)
+          FROM (
+            SELECT filename, caption, action_item_requested, uploader_id,
+                   uploaded_at, photo_number
+            FROM gemba_walk_photos
+            WHERE session_id = gs.id
+            ORDER BY photo_number
+          ) gph_agg
+        )                                               AS walk_photos
       FROM gemba_sessions gs
       LEFT JOIN employees e           ON e.employee_id = gs.created_by
       LEFT JOIN gemba_participants gp ON gp.session_id = gs.id
@@ -276,7 +137,17 @@ router.get('/sessions/:id', async (req, res) => {
             'joined_at',    gp.joined_at,
             'submitted_at', gp.submitted_at
           )
-        ) FILTER (WHERE gp.employee_id IS NOT NULL)     AS participants
+        ) FILTER (WHERE gp.employee_id IS NOT NULL)     AS participants,
+        (
+          SELECT json_agg(gph_agg)
+          FROM (
+            SELECT filename, caption, action_item_requested, uploader_id,
+                   uploaded_at, photo_number
+            FROM gemba_walk_photos
+            WHERE session_id = gs.id
+            ORDER BY photo_number
+          ) gph_agg
+        )                                               AS walk_photos
       FROM gemba_sessions gs
       LEFT JOIN employees e           ON e.employee_id = gs.created_by
       LEFT JOIN gemba_participants gp ON gp.session_id = gs.id
@@ -339,7 +210,124 @@ router.post('/sessions/:id/join', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
-// POST /api/gemba/sessions/:id/submit
+// POST /api/gemba/sessions/:id/walk-photo
+// NEW — upload a single photo during the walk (before review/submit)
+// Body (multipart): photo file + employee_id + caption (optional)
+// ─────────────────────────────────────────────────────────────────
+router.post('/sessions/:id/walk-photo', uploadPhotos.single('photo'), async (req, res) => {
+  try {
+    const sessionId  = req.params.id;
+    const employeeId = req.body.employee_id;
+    const caption    = req.body.caption || null;
+
+    if (!req.file)   return res.status(400).json({ error: 'No photo file provided' });
+    if (!employeeId) return res.status(400).json({ error: 'employee_id is required' });
+
+    const { rows: s } = await db.query(`SELECT * FROM gemba_sessions WHERE id = $1`, [sessionId]);
+    if (!s.length)              return res.status(404).json({ error: 'Session not found' });
+    if (s[0].status !== 'OPEN') return res.status(400).json({ error: 'Session is not open' });
+
+    // Get next photo number for this session
+    const { rows: countRows } = await db.query(
+      `SELECT COALESCE(MAX(photo_number), 0) + 1 AS next_num FROM gemba_walk_photos WHERE session_id = $1`,
+      [sessionId]
+    );
+    const photoNumber = countRows[0].next_num;
+
+    const { rows: photoRows } = await db.query(`
+      INSERT INTO gemba_walk_photos
+        (session_id, filename, caption, uploader_id, photo_number)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [sessionId, req.file.filename, caption, employeeId, photoNumber]);
+
+    res.json({
+      photo: photoRows[0],
+      url: `/files/${req.file.filename}`,
+    });
+  } catch (err) {
+    console.error('Error uploading walk photo:', err);
+    res.status(500).json({ error: 'Failed to upload photo' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/gemba/sessions/:id/walk-photos
+// Returns all walk photos for review before submission
+// ─────────────────────────────────────────────────────────────────
+router.get('/sessions/:id/walk-photos', async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT gp.*, e.name AS uploader_name
+      FROM gemba_walk_photos gp
+      LEFT JOIN employees e ON e.employee_id = gp.uploader_id
+      WHERE gp.session_id = $1
+      ORDER BY gp.photo_number
+    `, [req.params.id]);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching walk photos:', err);
+    res.status(500).json({ error: 'Failed to fetch photos' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PATCH /api/gemba/walk-photos/:photoId
+// Update a single walk photo: include_in_submission, caption,
+// action_item_requested, action_item_description
+// ─────────────────────────────────────────────────────────────────
+router.patch('/walk-photos/:photoId', async (req, res) => {
+  try {
+    const { include_in_submission, caption, action_item_requested, action_item_description } = req.body;
+    const { rows } = await db.query(`
+      UPDATE gemba_walk_photos
+      SET
+        include_in_submission  = COALESCE($1, include_in_submission),
+        caption                = COALESCE($2, caption),
+        action_item_requested  = COALESCE($3, action_item_requested),
+        action_item_description= COALESCE($4, action_item_description)
+      WHERE id = $5
+      RETURNING *
+    `, [
+      include_in_submission !== undefined ? include_in_submission : null,
+      caption       !== undefined ? caption       : null,
+      action_item_requested !== undefined ? action_item_requested : null,
+      action_item_description !== undefined ? action_item_description : null,
+      req.params.photoId,
+    ]);
+    if (!rows.length) return res.status(404).json({ error: 'Photo not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error updating walk photo:', err);
+    res.status(500).json({ error: 'Failed to update photo' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// DELETE /api/gemba/walk-photos/:photoId
+// Remove a walk photo from the session
+// ─────────────────────────────────────────────────────────────────
+router.delete('/walk-photos/:photoId', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `DELETE FROM gemba_walk_photos WHERE id = $1 RETURNING filename`,
+      [req.params.photoId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Photo not found' });
+    // Optionally clean file from disk
+    try {
+      const fp = path.join('/data/uploads', rows[0].filename);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    } catch (_) {}
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting walk photo:', err);
+    res.status(500).json({ error: 'Failed to delete photo' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/gemba/sessions/:id/submit  (unchanged — per-participant answers)
 // ─────────────────────────────────────────────────────────────────
 router.post('/sessions/:id/submit', async (req, res) => {
   try {
@@ -364,7 +352,8 @@ router.post('/sessions/:id/submit', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
-// POST /api/gemba/sessions/:id/photos
+// POST /api/gemba/sessions/:id/photos  (legacy per-participant photos)
+// Kept for backwards compat
 // ─────────────────────────────────────────────────────────────────
 router.post('/sessions/:id/photos', uploadPhotos.single('photo'), async (req, res) => {
   try {
@@ -389,6 +378,7 @@ router.post('/sessions/:id/photos', uploadPhotos.single('photo'), async (req, re
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/gemba/sessions/:id/close
+// Generates PDF now including walk photos with their action-item flags
 // ─────────────────────────────────────────────────────────────────
 router.post('/sessions/:id/close', async (req, res) => {
   try {
@@ -418,11 +408,23 @@ router.post('/sessions/:id/close', async (req, res) => {
       WHERE gs.session_id = $1 ORDER BY gs.submitted_at
     `, [sessionId]);
 
-    // ── FIND OR CREATE GEMBA SUBFOLDER ───────────────────────────
+    // Walk photos (only those flagged include_in_submission = true, or not yet reviewed = default include)
+    const { rows: walkPhotos } = await db.query(`
+      SELECT gp.*, e.name AS uploader_name
+      FROM gemba_walk_photos gp
+      LEFT JOIN employees e ON e.employee_id = gp.uploader_id
+      WHERE gp.session_id = $1
+        AND (gp.include_in_submission IS NULL OR gp.include_in_submission = true)
+      ORDER BY gp.photo_number
+    `, [sessionId]);
+
+    // Action items requested from photos
+    const actionItemPhotos = walkPhotos.filter(p => p.action_item_requested === true);
+
+    // Find/create GEMBA folder
     const { rows: restrictedFolders } = await db.query(
       `SELECT id FROM document_folders WHERE parent_folder_id IS NULL AND name ILIKE '%restricted%' LIMIT 1`
     );
-
     let gembaFolderId = null;
     if (restrictedFolders.length) {
       const restrictedId = restrictedFolders[0].id;
@@ -442,12 +444,11 @@ router.post('/sessions/:id/close', async (req, res) => {
       }
     }
 
-    // ── GENERATE PDF ─────────────────────────────────────────────
+    // Generate PDF
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const pdfName   = `GEMBA_${session.department}_${timestamp}.pdf`;
     const pdfDir    = '/data/documents';
     const pdfPath   = path.join(pdfDir, pdfName);
-
     if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
 
     if (PDFDocument) {
@@ -468,166 +469,158 @@ router.post('/sessions/:id/close', async (req, res) => {
         const stream = fs.createWriteStream(pdfPath);
         doc.pipe(stream);
 
-        // ── PAGE 1 ────────────────────────────────────────────────
         let y = drawHeader(doc, session.department, session.area);
         drawFooter(doc);
 
         // Status banner
-        const anyIssues = submissions.some(sub =>
-          Object.values(sub.answers || {}).some(v =>
-            ['Non-Compliant','Severe','Blocked','Down','Critical','Yes - Critical','Yes - Moderate'].includes(v)
-          )
-        );
-        const bannerColor = anyIssues ? COLOR.issue : COLOR.good;
-        const bannerBg    = anyIssues ? COLOR.issueBg : COLOR.goodBg;
-        const bannerLabel = anyIssues ? 'ACTION REQUIRED' : 'SESSION COMPLETE';
-
-        doc.rect(MARGIN, y, CONTENT, 36).fill(bannerBg);
-        doc.font(FONT.bold).fontSize(13).fillColor(bannerColor)
-           .text(bannerLabel, MARGIN + 12, y + 10);
-
-        const subLabel = `${submissions.length} of ${participants.length} submitted`;
+        doc.rect(MARGIN, y, CONTENT, 36).fill(COLOR.goodBg);
+        doc.font(FONT.bold).fontSize(13).fillColor(COLOR.good)
+           .text('SESSION COMPLETE', MARGIN + 12, y + 10);
+        const subLabel = `${submissions.length} of ${participants.length} submitted  ·  ${walkPhotos.length} photos`;
         const subW = doc.widthOfString(subLabel, { fontSize: 8 }) + 16;
         const subX = PAGE_W - MARGIN - subW;
         doc.roundedRect(subX, y + 9, subW, 16, 3).fill(COLOR.naBg);
         doc.font(FONT.bold).fontSize(8).fillColor(COLOR.na)
            .text(subLabel, subX, y + 13, { width: subW, align: 'center' });
-
         y += 48;
 
-        // Metadata grid — row 1
+        // Metadata grid
         doc.rect(MARGIN, y, CONTENT, 72).fill(COLOR.lightGray).stroke(COLOR.border);
-        const col   = CONTENT / 4;
-        const mY1   = y + 10;
-        metaRow(doc, 'Session Name', session.name,                                      MARGIN + 10,           mY1, col - 10);
-        metaRow(doc, 'Department',   session.department,                                MARGIN + 10 + col,     mY1, col - 10);
-        metaRow(doc, 'Area',         session.area,                                      MARGIN + 10 + col * 2, mY1, col - 10);
-        metaRow(doc, 'Created By',   session.created_by_name || session.created_by,    MARGIN + 10 + col * 3, mY1, col - 10);
+        const col  = CONTENT / 4;
+        const mY1  = y + 10;
+        metaRow(doc, 'Session Name', session.name,                                     MARGIN + 10,           mY1, col - 10);
+        metaRow(doc, 'Department',   session.department,                               MARGIN + 10 + col,     mY1, col - 10);
+        metaRow(doc, 'Area',         session.area,                                     MARGIN + 10 + col * 2, mY1, col - 10);
+        metaRow(doc, 'Created By',   session.created_by_name || session.created_by,   MARGIN + 10 + col * 3, mY1, col - 10);
         y += 84;
 
-        // Metadata grid — row 2
         doc.rect(MARGIN, y, CONTENT, 52).fill(COLOR.lightGray).stroke(COLOR.border);
         const mY2 = y + 10;
         metaRow(doc, 'Created At', new Date(session.created_at).toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' }), MARGIN + 10,       mY2, col - 10);
         metaRow(doc, 'Closed At',  new Date().toLocaleString('en-US',               { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' }), MARGIN + 10 + col, mY2, col - 10);
         y += 64;
 
-        // ── PARTICIPANTS ──────────────────────────────────────────
+        // Participants
         y = sectionBar(doc, 'Participants', y, session.department, session.area);
-
         participants.forEach((p, i) => {
           const submitted   = submissions.find(s => String(s.employee_id) === String(p.employee_id));
           const statusLabel = submitted ? '✓  Submitted' : '○  Not Submitted';
-          const meta        = submitted
-            ? { color: COLOR.good,  bg: COLOR.goodBg  }
-            : { color: COLOR.issue, bg: COLOR.issueBg };
+          const meta        = submitted ? { color: COLOR.good, bg: COLOR.goodBg } : { color: COLOR.issue, bg: COLOR.issueBg };
           const ROW_H = 22;
-
-          if (y + ROW_H > PAGE_H - 60) {
-            doc.addPage();
-            drawHeader(doc, session.department, session.area);
-            drawFooter(doc);
-            y = 88;
-          }
-
+          if (y + ROW_H > PAGE_H - 60) { doc.addPage(); drawHeader(doc, session.department, session.area); drawFooter(doc); y = 88; }
           if (i % 2 === 0) doc.rect(MARGIN, y, CONTENT, ROW_H).fill(COLOR.lightGray);
-
           doc.font(FONT.regular).fontSize(10).fillColor(COLOR.charcoal)
              .text(p.name, MARGIN + 8, y + 5, { width: CONTENT / 2 });
-
-          const badgeW = 120;
-          const badgeX = PAGE_W - MARGIN - badgeW;
+          const badgeW = 120, badgeX = PAGE_W - MARGIN - badgeW;
           doc.roundedRect(badgeX, y + 3, badgeW, 16, 3).fill(meta.bg);
           doc.font(FONT.bold).fontSize(8).fillColor(meta.color)
              .text(statusLabel, badgeX, y + 6, { width: badgeW, align: 'center' });
-
-          if (submitted) {
-            doc.font(FONT.regular).fontSize(8).fillColor(COLOR.midGray)
-               .text(
-                 new Date(submitted.submitted_at).toLocaleString('en-US', { timeZone: 'America/Chicago', timeStyle: 'short', dateStyle: 'short' }),
-                 MARGIN + CONTENT / 2, y + 6,
-                 { width: CONTENT / 2 - badgeW - 16, align: 'right' }
-               );
-          }
-
           y += ROW_H;
         });
-
         y += 12;
 
-        // ── SUBMISSIONS ───────────────────────────────────────────
-        submissions.forEach(sub => {
-          if (y + 40 > PAGE_H - 60) {
-            doc.addPage();
-            drawHeader(doc, session.department, session.area);
-            drawFooter(doc);
-            y = 88;
-          }
+        // Walk Photos section
+        if (walkPhotos.length > 0) {
+          y = sectionBar(doc, `Walk Photos (${walkPhotos.length} included in report)`, y, session.department, session.area);
 
-          // Dark submitter bar
+          walkPhotos.forEach((p, pi) => {
+            const fullPath = path.join('/data/uploads', p.filename);
+            const PHOTO_H  = 200;
+            const INFO_H   = p.action_item_requested ? 52 : 28;
+            if (y + PHOTO_H + INFO_H + 10 > PAGE_H - 60) {
+              doc.addPage(); drawHeader(doc, session.department, session.area); drawFooter(doc); y = 88;
+            }
+
+            // Photo label bar
+            const labelBg = p.action_item_requested ? COLOR.warnBg : COLOR.lightGray;
+            const labelFg = p.action_item_requested ? COLOR.warn   : COLOR.midGray;
+            doc.rect(MARGIN, y, CONTENT, 20).fill(labelBg);
+            doc.font(FONT.bold).fontSize(9).fillColor(labelFg)
+               .text(
+                 `Photo ${p.photo_number}${p.caption ? '  ·  ' + p.caption : ''}${p.uploader_name ? '  ·  ' + p.uploader_name : ''}`,
+                 MARGIN + 8, y + 5, { width: CONTENT - 16 }
+               );
+            if (p.action_item_requested) {
+              doc.font(FONT.bold).fontSize(8).fillColor(COLOR.warn)
+                 .text('⚠  ACTION ITEM REQUESTED', PAGE_W - MARGIN - 160, y + 5);
+            }
+            y += 22;
+
+            // Photo image
+            if (fs.existsSync(fullPath)) {
+              try {
+                const maxW = 420;
+                doc.image(fullPath, (PAGE_W - maxW) / 2, y, { fit: [maxW, PHOTO_H], align: 'center', valign: 'top' });
+                doc.rect((PAGE_W - maxW) / 2, y, maxW, PHOTO_H).lineWidth(0.5).stroke(COLOR.border);
+              } catch (_) {
+                doc.font(FONT.oblique).fontSize(9).fillColor(COLOR.midGray)
+                   .text(`[Photo not available: ${p.filename}]`, MARGIN, y + 8);
+              }
+            }
+            y += PHOTO_H + 6;
+
+            // Action item description if present
+            if (p.action_item_requested && p.action_item_description) {
+              doc.rect(MARGIN, y, CONTENT, 28).fill(COLOR.warnBg);
+              doc.font(FONT.bold).fontSize(8).fillColor(COLOR.warn)
+                 .text('ACTION ITEM:', MARGIN + 8, y + 5);
+              doc.font(FONT.regular).fontSize(9).fillColor(COLOR.warn)
+                 .text(p.action_item_description, MARGIN + 90, y + 5, { width: CONTENT - 100 });
+              y += 32;
+            }
+
+            y += 10;
+          });
+        }
+
+        // Action items summary
+        if (actionItemPhotos.length > 0) {
+          if (y + 60 > PAGE_H - 60) { doc.addPage(); drawHeader(doc, session.department, session.area); drawFooter(doc); y = 88; }
+          y = sectionBar(doc, `Action Items Summary (${actionItemPhotos.length})`, y, session.department, session.area);
+          actionItemPhotos.forEach((p, i) => {
+            const ROW_H = p.action_item_description ? 36 : 22;
+            if (y + ROW_H > PAGE_H - 60) { doc.addPage(); drawHeader(doc, session.department, session.area); drawFooter(doc); y = 88; }
+            if (i % 2 === 0) doc.rect(MARGIN, y, CONTENT, ROW_H).fill(COLOR.warnBg);
+            doc.font(FONT.bold).fontSize(9).fillColor(COLOR.warn)
+               .text(`Photo ${p.photo_number}`, MARGIN + 8, y + 5);
+            if (p.action_item_description) {
+              doc.font(FONT.regular).fontSize(9).fillColor(COLOR.charcoal)
+                 .text(p.action_item_description, MARGIN + 80, y + 5, { width: CONTENT - 90 });
+            }
+            y += ROW_H;
+          });
+          y += 12;
+        }
+
+        // Per-participant form submissions
+        submissions.forEach(sub => {
+          if (y + 40 > PAGE_H - 60) { doc.addPage(); drawHeader(doc, session.department, session.area); drawFooter(doc); y = 88; }
           doc.rect(MARGIN, y, CONTENT, 30).fill(COLOR.charcoal);
           doc.font(FONT.bold).fontSize(12).fillColor(COLOR.white)
              .text(sub.submitter_name || `Employee ${sub.employee_id}`, MARGIN + 10, y + 6);
           doc.font(FONT.regular).fontSize(8).fillColor('rgba(255,255,255,0.65)')
-             .text(
-               `Submitted: ${new Date(sub.submitted_at).toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' })}`,
-               MARGIN + 10, y + 19
-             );
+             .text(`Submitted: ${new Date(sub.submitted_at).toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' })}`, MARGIN + 10, y + 19);
           y += 38;
 
           const answers = sub.answers || {};
-
-          SECTIONS.forEach(section => {
-            const sectionQs  = GEMBA_QUESTIONS.filter(q => q.section === section);
-            const hasAnswers = sectionQs.some(q => answers[q.id]);
-            if (!hasAnswers) return;
-
-            y = sectionBar(doc, section, y, session.department, session.area);
-
-            let rowIndex = 0;
-            sectionQs.forEach(q => {
-              const val = answers[q.id];
-              if (!val) return;
-              if (q.type === 'select') {
-                y = answerRow(doc, q.label, val, y, session.department, session.area, rowIndex);
-                rowIndex++;
-              } else {
-                y = textRow(doc, q.label, val, y, session.department, session.area);
+          if (Object.keys(answers).length === 0) {
+            doc.font(FONT.oblique).fontSize(9).fillColor(COLOR.midGray)
+               .text('No answers recorded.', MARGIN + 8, y + 4);
+            y += 20;
+          } else {
+            Object.entries(answers).forEach(([key, val]) => {
+              if (!val || y + 22 > PAGE_H - 60) {
+                if (y + 22 > PAGE_H - 60) { doc.addPage(); drawHeader(doc, session.department, session.area); drawFooter(doc); y = 88; }
+                return;
               }
-            });
-
-            y += 6;
-          });
-
-          // Photos
-          if (sub.photos && sub.photos.length > 0) {
-            y = sectionBar(doc, `Photos — ${sub.submitter_name}`, y, session.department, session.area);
-
-            sub.photos.forEach((p, pi) => {
-              const fullPath = path.join('/data/uploads', path.basename(p.url));
-              if (!fs.existsSync(fullPath)) return;
-              const PHOTO_H = 220;
-              if (y + PHOTO_H + 20 > PAGE_H - 60) {
-                doc.addPage();
-                drawHeader(doc, session.department, session.area);
-                drawFooter(doc);
-                y = 88;
-              }
-              try {
-                const maxW = 420;
-                doc.image(fullPath, (PAGE_W - maxW) / 2, y, { fit: [maxW, PHOTO_H], align: 'center', valign: 'top' });
-                doc.rect((PAGE_W - maxW) / 2, y, maxW, PHOTO_H).lineWidth(1).stroke(COLOR.border);
-                doc.font(FONT.oblique).fontSize(8).fillColor(COLOR.midGray)
-                   .text(p.name || `Photo ${pi + 1}`, MARGIN, y + PHOTO_H + 4, { align: 'center', width: CONTENT });
-                y += PHOTO_H + 18;
-              } catch (_) {
-                doc.font(FONT.oblique).fontSize(9).fillColor(COLOR.midGray)
-                   .text(`[Photo: ${p.name}]`, MARGIN, y + 4);
-                y += 20;
-              }
+              doc.rect(MARGIN, y, CONTENT, 22).fill(COLOR.lightGray);
+              doc.font(FONT.regular).fontSize(9).fillColor(COLOR.midGray)
+                 .text(key.replace(/_/g, ' '), MARGIN + 8, y + 5, { width: CONTENT / 2 });
+              doc.font(FONT.bold).fontSize(9).fillColor(COLOR.charcoal)
+                 .text(String(val), MARGIN + CONTENT / 2 + 8, y + 5, { width: CONTENT / 2 - 16 });
+              y += 22;
             });
           }
-
           y += 16;
         });
 
@@ -636,24 +629,9 @@ router.post('/sessions/:id/close', async (req, res) => {
         stream.on('finish', resolve);
         stream.on('error', reject);
       });
-    } else {
-      // Fallback plain text
-      const txt = [
-        'GEMBA WALK REPORT',
-        `Session: ${session.name}`,
-        `Department: ${session.department} | Area: ${session.area}`,
-        `Created: ${session.created_at} | Closed: ${new Date().toISOString()}`,
-        `Participants: ${participants.length} | Submissions: ${submissions.length}`,
-        '',
-        ...submissions.map(sub => [
-          `--- ${sub.submitter_name} ---`,
-          ...Object.entries(sub.answers || {}).map(([k, v]) => `  ${k}: ${v}`),
-        ].join('\n')),
-      ].join('\n');
-      fs.writeFileSync(pdfPath.replace('.pdf', '.txt'), txt);
     }
 
-    // ── STORE IN DOCUMENT LIBRARY ─────────────────────────────────
+    // Store PDF in document library
     let docId = null;
     if (gembaFolderId) {
       try {
@@ -663,11 +641,10 @@ router.post('/sessions/:id/close', async (req, res) => {
         `, [
           gembaFolderId,
           `GEMBA Walk — ${session.department} — ${new Date().toLocaleDateString()}`,
-          `${session.name} | ${session.area} | ${submissions.length}/${participants.length} submissions`,
+          `${session.name} | ${session.area} | ${submissions.length}/${participants.length} submissions | ${walkPhotos.length} photos`,
           session.created_by,
         ]);
         docId = docRows[0].id;
-
         await db.query(`
           INSERT INTO document_versions (document_id, version_number, file_path, file_type, uploaded_by, change_comment)
           VALUES ($1, 1, $2, 'application/pdf', $3, 'Auto-generated from GEMBA Walk session')
@@ -677,14 +654,38 @@ router.post('/sessions/:id/close', async (req, res) => {
       }
     }
 
-    // ── CLOSE SESSION ─────────────────────────────────────────────
+    // Create action items in the action_items table for photos that requested them
+    for (const p of actionItemPhotos) {
+      try {
+        await db.query(`
+          INSERT INTO action_items
+            (title, description, source_type, source_id, photo_url, created_by, status)
+          VALUES ($1, $2, 'GEMBA_WALK', $3, $4, $5, 'Open')
+          ON CONFLICT DO NOTHING
+        `, [
+          `Gemba Walk Action Item — Photo ${p.photo_number}`,
+          p.action_item_description || `Action item from Gemba Walk photo ${p.photo_number}`,
+          sessionId,
+          `/files/${p.filename}`,
+          session.created_by,
+        ]);
+      } catch (aiErr) {
+        console.error('Error creating action item for photo:', aiErr);
+      }
+    }
+
     await db.query(`
       UPDATE gemba_sessions
       SET status = 'CLOSED', closed_at = NOW(), pdf_path = $1, document_id = $2
       WHERE id = $3
     `, [pdfPath, docId, sessionId]);
 
-    res.json({ success: true, pdf_path: pdfPath, document_id: docId });
+    res.json({
+      success: true,
+      pdf_path: pdfPath,
+      document_id: docId,
+      action_items_created: actionItemPhotos.length,
+    });
   } catch (err) {
     console.error('Error closing gemba session:', err);
     res.status(500).json({ error: 'Failed to close session' });
