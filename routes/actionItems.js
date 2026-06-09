@@ -284,4 +284,61 @@ router.get('/export/excel', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// POST /api/action-items/batch-photos
+// Batch upload photos to multiple action items.
+// Each file should be named: {action_item_id}_{anything}.{ext}
+// or the body field `mappings` JSON array: [{action_item_id, filename}]
+// Accepts up to 100 photos via multipart field "photos"
+// ─────────────────────────────────────────────────────────────────
+router.post('/batch-photos', uploadPhotos.array('photos', 100), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No photos provided' });
+    }
+
+    const results = [];
+    const errors  = [];
+
+    for (const file of req.files) {
+      // Extract action item ID from filename: expects prefix like "123_photo.jpg" or "123-photo.jpg"
+      const match = file.originalname.match(/^(\d+)[_\-]/);
+      if (!match) {
+        errors.push({ filename: file.originalname, error: 'Filename must start with action item ID followed by _ or - (e.g. 123_photo.jpg)' });
+        continue;
+      }
+
+      const actionItemId = parseInt(match[1], 10);
+
+      // Verify action item exists
+      const check = await db.query('SELECT id FROM action_items WHERE id = $1', [actionItemId]);
+      if (!check.rows.length) {
+        errors.push({ filename: file.originalname, action_item_id: actionItemId, error: `Action item ${actionItemId} not found` });
+        continue;
+      }
+
+      const photoUrl = `/files/${file.filename}`;
+
+      // Get existing attachments
+      const existing = await db.query('SELECT attachments FROM action_items WHERE id = $1', [actionItemId]);
+      let attachments = [];
+      try { attachments = JSON.parse(existing.rows[0].attachments || '[]'); } catch { attachments = []; }
+
+      attachments.push({ type: 'photo', url: photoUrl, name: file.originalname, size: file.size });
+
+      await db.query(
+        'UPDATE action_items SET attachments = $1, updated_at = NOW() WHERE id = $2',
+        [JSON.stringify(attachments), actionItemId]
+      );
+
+      results.push({ filename: file.originalname, action_item_id: actionItemId, url: photoUrl });
+    }
+
+    res.json({ success: true, uploaded: results.length, errors: errors.length, results, errors });
+  } catch (err) {
+    console.error('Error in batch photo upload:', err);
+    res.status(500).json({ error: 'Batch upload failed', details: err.message });
+  }
+});
+
 module.exports = router;
