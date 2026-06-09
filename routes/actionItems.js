@@ -9,6 +9,7 @@ const { uploadPhotos } = require('../middleware/upload');
 async function getFilteredActionItems(filters = {}) {
   const {
     status         = null,
+    hide_complete  = false,
     department     = null,
     classification = null,
     owner          = null,
@@ -24,6 +25,8 @@ async function getFilteredActionItems(filters = {}) {
   if (status) {
     params.push(status);
     query += ` AND status = $${params.length}`;
+  } else if (hide_complete) {
+    query += ` AND status != 'COMPLETE'`;
   }
   if (department) {
     params.push(department);
@@ -74,6 +77,7 @@ router.get('/', async (req, res) => {
       search:         req.query.search         || null,
       sort:           req.query.sort           || 'id',
       direction:      req.query.direction      || 'asc',
+      hide_complete:  req.query.hide_complete === 'true',
     };
     const rows = await getFilteredActionItems(filters);
     res.json(rows);
