@@ -29,27 +29,15 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET LEADERS ONLY (site_admin = true) — must be before /:employee_id
+// GET LEADERS ONLY (site_admin = 'yes') — must be before /:employee_id
 router.get("/leaders", async (req, res) => {
   try {
-    // Try site_admin column first; fall back to all active employees if column missing
-    let result;
-    try {
-      result = await pool.query(
-        `SELECT employee_id, name, email
-         FROM employees
-         WHERE site_admin = true AND (active IS NULL OR active = true)
-         ORDER BY name ASC`
-      );
-    } catch (colErr) {
-      // Column may not exist — return all active employees as fallback
-      result = await pool.query(
-        `SELECT employee_id, name, email
-         FROM employees
-         WHERE active IS NULL OR active = true
-         ORDER BY name ASC`
-      );
-    }
+    const result = await pool.query(
+      `SELECT employee_id, name, email
+       FROM employees
+       WHERE site_admin = 'yes'
+       ORDER BY name ASC`
+    );
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching leaders:", error);
