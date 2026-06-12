@@ -464,4 +464,186 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// GET /api/incidents/open
+// Returns all OPEN incident investigation sessions (not closed/submitted)
+// ─────────────────────────────────────────────────────────────────
+router.get('/open', async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT id, employee_name, department, incident_date, report_date,
+             status, created_at, investigator_name, supervisor
+      FROM incident_investigations
+      WHERE status IN ('OPEN','IN_PROGRESS')
+      ORDER BY created_at DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching open incidents:', err);
+    res.status(500).json({ error: 'Failed to fetch open incidents' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/incidents/:id/full
+// Returns one full investigation record for editing/joining
+// ─────────────────────────────────────────────────────────────────
+router.get('/:id/full', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM incident_investigations WHERE id = $1`, [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const record = rows[0];
+    // Parse JSON fields if stored as strings
+    if (typeof record.incident_types === 'string') {
+      try { record.incident_types = JSON.parse(record.incident_types); } catch { record.incident_types = []; }
+    }
+    if (typeof record.photos === 'string') {
+      try { record.photos = JSON.parse(record.photos); } catch { record.photos = []; }
+    }
+    res.json(record);
+  } catch (err) {
+    console.error('Error fetching incident full:', err);
+    res.status(500).json({ error: 'Failed to fetch incident' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/incidents/:id/request-signatures
+// Stores requested additional leader IDs and sends notification emails
+// Body: { additional_leader_ids: [id, ...] }
+// ─────────────────────────────────────────────────────────────────
+router.post('/:id/request-signatures', async (req, res) => {
+  try {
+    const { additional_leader_ids = [] } = req.body;
+
+    // Get the incident record
+    const { rows: incRows } = await db.query(
+      `SELECT * FROM incident_investigations WHERE id = $1`, [req.params.id]
+    );
+    if (!incRows.length) return res.status(404).json({ error: 'Not found' });
+    const incident = incRows[0];
+
+    // Store additional leader IDs on the record
+    await db.query(
+      `UPDATE incident_investigations SET additional_signature_ids = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(additional_leader_ids), req.params.id]
+    );
+
+    // Find Bridgette Butler (look up by name since she's always required)
+    const { rows: bridgetteRows } = await db.query(
+      `SELECT employee_id, name, email FROM employees WHERE name ILIKE '%bridgette%butler%' LIMIT 1`
+    );
+    const bridgette = bridgetteRows[0] || null;
+
+    // Collect emails to notify
+    const recipientEmails = [];
+
+    if (bridgette?.email) recipientEmails.push({ name: bridgette.name, email: bridgette.email });
+
+    if (additional_leader_ids.length > 0) {
+      const placeholders = additional_leader_ids.map((_, i) => `$${i + 1}`).join(',');
+      const { rows: leaderRows } = await db.query(
+        `SELECT employee_id, name, email FROM employees WHERE employee_id IN (${placeholders}) AND email IS NOT NULL`,
+        additional_leader_ids
+      );
+      leaderRows.forEach(l => recipientEmails.push({ name: l.name, email: l.email }));
+    }
+
+    // Send emails
+    const nodemailer = (() => { try { return require('nodemailer'); } catch { return null; } })();
+    if (nodemailer && process.env.EMAIL_USER) {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      });
+      for (const recipient of recipientEmails) {
+        if (!recipient.email) continue;
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: recipient.email,
+          subject: `ACTION REQUIRED: Sign Incident Investigation — ${incident.employee_name || 'Unknown'} (${incident.incident_date || 'N/A'})`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;">
+              <div style="background:#B30000;padding:20px 24px;border-radius:6px 6px 0 0;">
+                <h2 style="color:#fff;margin:0;font-size:18px;letter-spacing:2px;">INCIDENT INVESTIGATION — SIGNATURE REQUIRED</h2>
+                <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:12px;">Dal-Tile Muskogee Safety App</p>
+              </div>
+              <div style="background:#f9f9f9;padding:24px;border:1px solid #ddd;border-radius:0 0 6px 6px;">
+                <p>Hi ${recipient.name},</p>
+                <p>Your signature is required on an Incident Investigation Report.</p>
+                <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+                  <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f4f4f4;">Employee</td><td style="padding:8px;border:1px solid #ddd;">${incident.employee_name || '—'}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f4f4f4;">Department</td><td style="padding:8px;border:1px solid #ddd;">${incident.department || '—'}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f4f4f4;">Incident Date</td><td style="padding:8px;border:1px solid #ddd;">${incident.incident_date || '—'}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;background:#f4f4f4;">Investigator</td><td style="padding:8px;border:1px solid #ddd;">${incident.investigator_name || '—'}</td></tr>
+                </table>
+                <p>Please log in to the Safety App and open this investigation to add your signature.</p>
+                <p style="font-size:11px;color:#888;">This is an automated notification from the Dal-Tile Muskogee Safety App.</p>
+              </div>
+            </div>
+          `,
+        }).catch(e => console.error('Email send error:', e));
+      }
+    }
+
+    res.json({ success: true, notified: recipientEmails.length });
+  } catch (err) {
+    console.error('Error requesting signatures:', err);
+    res.status(500).json({ error: 'Failed to request signatures' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/incidents/:id/add-signature
+// Saves an additional leader signature to the investigation
+// Body: { signer_id, signer_name, signature_dataurl, role }
+// ─────────────────────────────────────────────────────────────────
+router.post('/:id/add-signature', async (req, res) => {
+  try {
+    const { signer_id, signer_name, signature_dataurl, role = 'additional' } = req.body;
+    if (!signature_dataurl) return res.status(400).json({ error: 'signature_dataurl required' });
+
+    const { rows: existing } = await db.query(
+      `SELECT additional_signatures FROM incident_investigations WHERE id = $1`, [req.params.id]
+    );
+    if (!existing.length) return res.status(404).json({ error: 'Not found' });
+
+    let sigs = [];
+    if (existing[0].additional_signatures) {
+      try { sigs = JSON.parse(existing[0].additional_signatures); } catch { sigs = []; }
+    }
+    sigs.push({ signer_id, signer_name, role, signature_dataurl, signed_at: new Date().toISOString() });
+
+    await db.query(
+      `UPDATE incident_investigations SET additional_signatures = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(sigs), req.params.id]
+    );
+
+    res.json({ success: true, signature_count: sigs.length });
+  } catch (err) {
+    console.error('Error adding signature:', err);
+    res.status(500).json({ error: 'Failed to add signature' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// POST /api/incidents/:id/close
+// Marks investigation as CLOSED / complete
+// ─────────────────────────────────────────────────────────────────
+router.post('/:id/close', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `UPDATE incident_investigations SET status = 'CLOSED', updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true, incident: rows[0] });
+  } catch (err) {
+    console.error('Error closing incident:', err);
+    res.status(500).json({ error: 'Failed to close investigation' });
+  }
+});
+
 module.exports = router;
