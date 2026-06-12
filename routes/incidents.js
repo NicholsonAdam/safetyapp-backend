@@ -289,196 +289,10 @@ router.post('/submit', async (req, res) => {
 
     const incidentId = insertResult.rows[0].id;
 
-    // ── GENERATE PDF ─────────────────────────────────────────────
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const pdfName   = `INCIDENT_${incidentId}_${timestamp}.pdf`;
-    const pdfDir    = '/data/documents/incidents';
-    const pdfPath   = path.join(pdfDir, pdfName);
-    if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
+    // PDF is NOT generated here. It is generated when the investigation is CLOSED
+    // after all required signatures have been collected.
 
-    if (PDFDocument) {
-      await new Promise((resolve, reject) => {
-        const doc = new PDFDocument({
-          size: 'LETTER', margins: { top: 0, right: 0, bottom: 0, left: 0 },
-          autoFirstPage: true, bufferPages: true,
-          info: { Title: `Incident Investigation #${incidentId}`, Author: investigator_name || 'Dal-Tile', Creator: 'Dal-Tile Safety App' },
-        });
-
-        const stream = fs.createWriteStream(pdfPath);
-        doc.pipe(stream);
-
-        let y = drawHeader(doc, 'Incident Investigation Report');
-        drawFooter(doc);
-
-        doc.rect(MARGIN, y, CONTENT, 36).fill(COLOR.issueBg);
-        doc.font(FONT.bold).fontSize(13).fillColor(COLOR.issue)
-           .text('INCIDENT INVESTIGATION', MARGIN + 12, y + 10);
-        const idLabel = `#${incidentId}`;
-        const idW = doc.widthOfString(idLabel, { fontSize: 12 }) + 20;
-        const idX = PAGE_W - MARGIN - idW;
-        doc.roundedRect(idX, y + 9, idW, 18, 3).fill(COLOR.issueBg);
-        doc.font(FONT.bold).fontSize(12).fillColor(COLOR.issue)
-           .text(idLabel, idX, y + 12, { width: idW, align: 'center' });
-        y += 48;
-
-        // Delay banner if applicable
-        if (delay_reason) {
-          doc.rect(MARGIN, y, CONTENT, 36).fill(COLOR.warnBg);
-          doc.font(FONT.bold).fontSize(8).fillColor(COLOR.warn)
-             .text('REPORTING DELAY — EXPLANATION PROVIDED', MARGIN + 10, y + 6);
-          doc.font(FONT.regular).fontSize(9).fillColor(COLOR.warn)
-             .text(delay_reason, MARGIN + 10, y + 18, { width: CONTENT - 20 });
-          y += 46;
-        }
-
-        const col = CONTENT / 4, mY = y + 10;
-        doc.rect(MARGIN, y, CONTENT, 72).fill(COLOR.lightGray).stroke(COLOR.border);
-        metaRow(doc, 'Employee',   employee_name,   MARGIN + 10,           mY, col - 10);
-        metaRow(doc, 'Employee #', employee_number, MARGIN + 10 + col,     mY, col - 10);
-        metaRow(doc, 'Position',   position_title,  MARGIN + 10 + col * 2, mY, col - 10);
-        metaRow(doc, 'Department', department,      MARGIN + 10 + col * 3, mY, col - 10);
-        y += 84;
-
-        doc.rect(MARGIN, y, CONTENT, 52).fill(COLOR.lightGray).stroke(COLOR.border);
-        const mY2 = y + 10;
-        metaRow(doc, 'Incident Date', incident_date,  MARGIN + 10,           mY2, col - 10);
-        metaRow(doc, 'Time',          incident_time,  MARGIN + 10 + col,     mY2, col - 10);
-        metaRow(doc, 'Location',      location,       MARGIN + 10 + col * 2, mY2, col - 10);
-        metaRow(doc, 'Shift',         shift,          MARGIN + 10 + col * 3, mY2, col - 10);
-        y += 64;
-
-        doc.rect(MARGIN, y, CONTENT, 52).fill(COLOR.lightGray).stroke(COLOR.border);
-        const mY3 = y + 10;
-        metaRow(doc, 'Supervisor',   supervisor,          MARGIN + 10,           mY3, col - 10);
-        metaRow(doc, 'Witness',      witness,             MARGIN + 10 + col,     mY3, col - 10);
-        metaRow(doc, 'Report Date',  report_date,         MARGIN + 10 + col * 2, mY3, col - 10);
-        metaRow(doc, 'Completed By', report_completed_by, MARGIN + 10 + col * 3, mY3, col - 10);
-        y += 64;
-
-        const types = Array.isArray(incident_types) ? incident_types : [];
-        if (types.length > 0) {
-          y = sectionBar(doc, 'Type of Incident', y);
-          const typeStr = types.join('  ·  ');
-          const typeH = Math.max(doc.heightOfString(typeStr, { width: CONTENT - 20 }) + 16, 28);
-          doc.rect(MARGIN, y, CONTENT, typeH).fill(COLOR.issueBg);
-          doc.font(FONT.bold).fontSize(10).fillColor(COLOR.issue)
-             .text(typeStr, MARGIN + 10, y + 8, { width: CONTENT - 20 });
-          y += typeH + 8;
-        }
-
-        y = sectionBar(doc, 'Injury Details', y);
-        y = fieldBlock(doc, 'Injured Body Part', injured_body_part, y);
-        y = fieldBlock(doc, 'Description of Injury', description_of_injury, y);
-        y = sectionBar(doc, 'Description of Incident', y);
-        y = fieldBlock(doc, 'What happened — who, what, where, when, how', description_of_incident, y);
-        y = sectionBar(doc, 'Injury Potential', y);
-        y = fieldBlock(doc, 'Potential injury that could have occurred', injury_potential, y);
-        y = sectionBar(doc, 'Investigation Findings', y);
-        y = fieldBlock(doc, 'Facts obtained during investigation', investigation_findings, y);
-        y = sectionBar(doc, 'Basic Causes', y);
-        y = fieldBlock(doc, 'Hazard, condition or behavior that contributed', basic_causes, y);
-        y = sectionBar(doc, 'Corrective Actions', y);
-        y = fieldBlock(doc, 'Actions to prevent recurrence', corrective_actions, y);
-        y = fieldBlock(doc, 'Corrective Responsibility', corrective_responsibility, y);
-
-        const photoList = Array.isArray(photos) ? photos : [];
-        if (photoList.length > 0) {
-          y = sectionBar(doc, `Attached Photos (${photoList.length})`, y);
-          photoList.forEach((p, pi) => {
-            const fullPath = path.join('/data/uploads', path.basename(p.url));
-            if (!fs.existsSync(fullPath)) return;
-            const PHOTO_H = 220;
-            if (y + PHOTO_H + 20 > PAGE_H - 60) {
-              doc.addPage(); y = drawHeader(doc, 'Incident Investigation Report'); drawFooter(doc); y = 88;
-            }
-            try {
-              const maxW = 420;
-              doc.image(fullPath, (PAGE_W - maxW) / 2, y, { fit: [maxW, PHOTO_H], align: 'center', valign: 'top' });
-              doc.rect((PAGE_W - maxW) / 2, y, maxW, PHOTO_H).lineWidth(1).stroke(COLOR.border);
-              doc.font(FONT.oblique).fontSize(8).fillColor(COLOR.midGray)
-                 .text(p.name || `Photo ${pi + 1}`, MARGIN, y + PHOTO_H + 4, { align: 'center', width: CONTENT });
-              y += PHOTO_H + 18;
-            } catch (_) {
-              doc.font(FONT.oblique).fontSize(9).fillColor(COLOR.midGray)
-                 .text(`[Photo: ${p.name}]`, MARGIN, y + 4);
-              y += 20;
-            }
-          });
-        }
-
-        // Signatures page
-        doc.addPage();
-        y = drawHeader(doc, 'Incident Investigation Report');
-        drawFooter(doc);
-        y = 88;
-        y = sectionBar(doc, 'Signatures & Acknowledgement', y);
-        const SIG_W = (CONTENT - 20) / 2;
-        const SIG_H = 100;
-        const sigY  = y + 8;
-
-        doc.rect(MARGIN, sigY, SIG_W, SIG_H + 30).stroke(COLOR.border);
-        doc.font(FONT.bold).fontSize(9).fillColor(COLOR.midGray)
-           .text('TEAM MEMBER SIGNATURE', MARGIN + 8, sigY + 6);
-        doc.font(FONT.regular).fontSize(8).fillColor(COLOR.midGray)
-           .text(employee_name || '—', MARGIN + 8, sigY + 18);
-        try {
-          if (employee_signature && employee_signature.startsWith('data:image')) {
-            const imgBuf = Buffer.from(employee_signature.split(',')[1], 'base64');
-            const tmpSig = `/tmp/emp_sig_${incidentId}.png`;
-            fs.writeFileSync(tmpSig, imgBuf);
-            doc.image(tmpSig, MARGIN + 8, sigY + 28, { width: SIG_W - 16, height: SIG_H - 10, fit: [SIG_W - 16, SIG_H - 10] });
-            try { fs.unlinkSync(tmpSig); } catch (_) {}
-          }
-        } catch (_) {}
-
-        const sigX2 = MARGIN + SIG_W + 20;
-        doc.rect(sigX2, sigY, SIG_W, SIG_H + 30).stroke(COLOR.border);
-        doc.font(FONT.bold).fontSize(9).fillColor(COLOR.midGray)
-           .text('INVESTIGATOR SIGNATURE', sigX2 + 8, sigY + 6);
-        doc.font(FONT.regular).fontSize(8).fillColor(COLOR.midGray)
-           .text(investigator_name || '—', sigX2 + 8, sigY + 18);
-        try {
-          if (investigator_signature && investigator_signature.startsWith('data:image')) {
-            const imgBuf = Buffer.from(investigator_signature.split(',')[1], 'base64');
-            const tmpSig = `/tmp/inv_sig_${incidentId}.png`;
-            fs.writeFileSync(tmpSig, imgBuf);
-            doc.image(tmpSig, sigX2 + 8, sigY + 28, { width: SIG_W - 16, height: SIG_H - 10, fit: [SIG_W - 16, SIG_H - 10] });
-            try { fs.unlinkSync(tmpSig); } catch (_) {}
-          }
-        } catch (_) {}
-
-        doc.flushPages();
-        doc.end();
-        stream.on('finish', resolve);
-        stream.on('error', reject);
-      });
-    }
-
-    let docId = null;
-    try {
-      const { rows: docRows } = await db.query(`
-        INSERT INTO documents (folder_id, title, description, created_by)
-        VALUES ($1, $2, $3, $4) RETURNING id
-      `, [
-        INCIDENT_FOLDER_ID,
-        `Incident Investigation #${incidentId} — ${employee_name || 'Unknown'} — ${incident_date || report_date || ''}`,
-        `${department || ''} | ${location || ''} | Investigator: ${investigator_name || ''}`,
-        submitted_by,
-      ]);
-      docId = docRows[0].id;
-      await db.query(`
-        INSERT INTO document_versions (document_id, version_number, file_path, file_type, uploaded_by, change_comment)
-        VALUES ($1, 1, $2, 'application/pdf', $3, 'Auto-generated from Incident Investigation')
-      `, [docId, `/data/documents/incidents/${pdfName}`, submitted_by]);
-    } catch (docErr) {
-      console.error('Error storing incident PDF in document library:', docErr);
-    }
-
-    await db.query(`
-      UPDATE incident_investigations SET pdf_path = $1, document_id = $2 WHERE id = $3
-    `, [pdfPath, docId, incidentId]);
-
-    res.json({ success: true, id: incidentId, pdf_path: pdfPath, document_id: docId });
+    res.json({ success: true, id: incidentId, incident_id: incidentId });
   } catch (err) {
     console.error('Error submitting incident investigation:', err);
     res.status(500).json({ error: 'Failed to submit investigation' });
@@ -629,16 +443,229 @@ router.post('/:id/add-signature', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────
 // POST /api/incidents/:id/close
-// Marks investigation as CLOSED / complete
+// Marks investigation CLOSED and generates the final PDF with ALL signatures
 // ─────────────────────────────────────────────────────────────────
 router.post('/:id/close', async (req, res) => {
   try {
-    const { rows } = await db.query(
-      `UPDATE incident_investigations SET status = 'CLOSED', updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [req.params.id]
-    );
+    // Load full record
+    const { rows } = await db.query(`SELECT * FROM incident_investigations WHERE id = $1`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json({ success: true, incident: rows[0] });
+    const r = rows[0];
+
+    // Parse JSON fields
+    const incident_types   = (() => { try { return JSON.parse(r.incident_types || '[]'); } catch { return []; } })();
+    const photos           = (() => { try { return JSON.parse(r.photos         || '[]'); } catch { return []; } })();
+    const additionalSigs   = (() => { try { return JSON.parse(r.additional_signatures || '[]'); } catch { return []; } })();
+
+    const INCIDENT_FOLDER_ID = 23;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const pdfName   = `INCIDENT_${r.id}_${timestamp}.pdf`;
+    const pdfDir    = '/data/documents/incidents';
+    const pdfPath   = path.join(pdfDir, pdfName);
+    if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
+
+    if (PDFDocument) {
+      await new Promise((resolve, reject) => {
+        const doc = new PDFDocument({
+          size: 'LETTER', margins: { top: 0, right: 0, bottom: 0, left: 0 },
+          autoFirstPage: true, bufferPages: true,
+          info: { Title: `Incident Investigation #${r.id}`, Author: r.investigator_name || 'Dal-Tile', Creator: 'Dal-Tile Safety App' },
+        });
+        const stream = fs.createWriteStream(pdfPath);
+        doc.pipe(stream);
+
+        let y = drawHeader(doc, 'Incident Investigation Report');
+        drawFooter(doc);
+
+        // ID banner
+        doc.rect(MARGIN, y, CONTENT, 36).fill(COLOR.issueBg);
+        doc.font(FONT.bold).fontSize(13).fillColor(COLOR.issue)
+           .text('INCIDENT INVESTIGATION', MARGIN + 12, y + 10);
+        const idLabel = `#${r.id}`;
+        const idW = doc.widthOfString(idLabel, { fontSize: 12 }) + 20;
+        doc.font(FONT.bold).fontSize(12).fillColor(COLOR.issue)
+           .text(idLabel, PAGE_W - MARGIN - idW, y + 12, { width: idW, align: 'center' });
+        y += 48;
+
+        // Delay banner
+        if (r.delay_reason) {
+          doc.rect(MARGIN, y, CONTENT, 36).fill(COLOR.warnBg);
+          doc.font(FONT.bold).fontSize(8).fillColor(COLOR.warn)
+             .text('REPORTING DELAY — EXPLANATION PROVIDED', MARGIN + 10, y + 6);
+          doc.font(FONT.regular).fontSize(9).fillColor(COLOR.warn)
+             .text(r.delay_reason, MARGIN + 10, y + 18, { width: CONTENT - 20 });
+          y += 46;
+        }
+
+        // Employee / incident meta rows
+        const col = CONTENT / 4;
+        doc.rect(MARGIN, y, CONTENT, 72).fill(COLOR.lightGray).stroke(COLOR.border);
+        metaRow(doc, 'Employee',   r.employee_name,   MARGIN + 10,           y + 10, col - 10);
+        metaRow(doc, 'Employee #', r.employee_number, MARGIN + 10 + col,     y + 10, col - 10);
+        metaRow(doc, 'Position',   r.position_title,  MARGIN + 10 + col * 2, y + 10, col - 10);
+        metaRow(doc, 'Department', r.department,      MARGIN + 10 + col * 3, y + 10, col - 10);
+        y += 84;
+
+        doc.rect(MARGIN, y, CONTENT, 52).fill(COLOR.lightGray).stroke(COLOR.border);
+        metaRow(doc, 'Incident Date', r.incident_date, MARGIN + 10,           y + 10, col - 10);
+        metaRow(doc, 'Time',          r.incident_time, MARGIN + 10 + col,     y + 10, col - 10);
+        metaRow(doc, 'Location',      r.location,      MARGIN + 10 + col * 2, y + 10, col - 10);
+        metaRow(doc, 'Shift',         r.shift,         MARGIN + 10 + col * 3, y + 10, col - 10);
+        y += 64;
+
+        doc.rect(MARGIN, y, CONTENT, 52).fill(COLOR.lightGray).stroke(COLOR.border);
+        metaRow(doc, 'Supervisor',   r.supervisor,          MARGIN + 10,           y + 10, col - 10);
+        metaRow(doc, 'Witness',      r.witness,             MARGIN + 10 + col,     y + 10, col - 10);
+        metaRow(doc, 'Report Date',  r.report_date,         MARGIN + 10 + col * 2, y + 10, col - 10);
+        metaRow(doc, 'Completed By', r.report_completed_by, MARGIN + 10 + col * 3, y + 10, col - 10);
+        y += 64;
+
+        if (incident_types.length > 0) {
+          y = sectionBar(doc, 'Type of Incident', y);
+          const typeStr = incident_types.join('  ·  ');
+          const typeH = Math.max(doc.heightOfString(typeStr, { width: CONTENT - 20 }) + 16, 28);
+          doc.rect(MARGIN, y, CONTENT, typeH).fill(COLOR.issueBg);
+          doc.font(FONT.bold).fontSize(10).fillColor(COLOR.issue)
+             .text(typeStr, MARGIN + 10, y + 8, { width: CONTENT - 20 });
+          y += typeH + 8;
+        }
+
+        y = sectionBar(doc, 'Injury Details', y);
+        y = fieldBlock(doc, 'Injured Body Part', r.injured_body_part, y);
+        y = fieldBlock(doc, 'Description of Injury', r.description_of_injury, y);
+        y = sectionBar(doc, 'Description of Incident', y);
+        y = fieldBlock(doc, 'What happened — who, what, where, when, how', r.description_of_incident, y);
+        y = sectionBar(doc, 'Injury Potential', y);
+        y = fieldBlock(doc, 'Potential injury that could have occurred', r.injury_potential, y);
+        y = sectionBar(doc, 'Investigation Findings', y);
+        y = fieldBlock(doc, 'Facts obtained during investigation', r.investigation_findings, y);
+        y = sectionBar(doc, 'Basic Causes', y);
+        y = fieldBlock(doc, 'Hazard, condition or behavior that contributed', r.basic_causes, y);
+        y = sectionBar(doc, 'Corrective Actions', y);
+        y = fieldBlock(doc, 'Actions to prevent recurrence', r.corrective_actions, y);
+        y = fieldBlock(doc, 'Corrective Responsibility', r.corrective_responsibility, y);
+
+        // Photos
+        if (photos.length > 0) {
+          y = sectionBar(doc, `Attached Photos (${photos.length})`, y);
+          photos.forEach((p, pi) => {
+            const fullPath = path.join('/data/uploads', path.basename(p.url));
+            if (!fs.existsSync(fullPath)) return;
+            const PHOTO_H = 220;
+            if (y + PHOTO_H + 20 > PAGE_H - 60) {
+              doc.addPage(); y = drawHeader(doc, 'Incident Investigation Report'); drawFooter(doc); y = 88;
+            }
+            try {
+              doc.image(fullPath, (PAGE_W - 420) / 2, y, { fit: [420, PHOTO_H], align: 'center', valign: 'top' });
+              doc.rect((PAGE_W - 420) / 2, y, 420, PHOTO_H).lineWidth(1).stroke(COLOR.border);
+              doc.font(FONT.oblique).fontSize(8).fillColor(COLOR.midGray)
+                 .text(p.name || `Photo ${pi + 1}`, MARGIN, y + PHOTO_H + 4, { align: 'center', width: CONTENT });
+              y += PHOTO_H + 18;
+            } catch (_) {
+              doc.font(FONT.oblique).fontSize(9).fillColor(COLOR.midGray).text(`[Photo: ${p.name}]`, MARGIN, y + 4);
+              y += 20;
+            }
+          });
+        }
+
+        // ── SIGNATURES PAGE ────────────────────────────────────────
+        doc.addPage();
+        y = drawHeader(doc, 'Incident Investigation Report');
+        drawFooter(doc);
+        y = 88;
+        y = sectionBar(doc, 'Signatures & Acknowledgement', y);
+
+        // Build full list: TM, Investigator, then all additional sigs
+        const allSigs = [
+          { label: 'TEAM MEMBER SIGNATURE',  name: r.employee_name    || '—', dataUrl: r.employee_signature    },
+          { label: 'INVESTIGATOR SIGNATURE', name: r.investigator_name || '—', dataUrl: r.investigator_signature },
+          ...additionalSigs.map(s => ({ label: (s.role || 'ADDITIONAL').toUpperCase() + ' SIGNATURE', name: s.signer_name || '—', dataUrl: s.signature_dataurl })),
+        ];
+
+        const SIG_W = (CONTENT - 20) / 2;
+        const SIG_H = 100;
+
+        for (let si = 0; si < allSigs.length; si += 2) {
+          const left  = allSigs[si];
+          const right = allSigs[si + 1];
+          const sigY  = y + 8;
+          const rowH  = SIG_H + 40;
+
+          if (sigY + rowH > PAGE_H - 60) {
+            doc.addPage(); y = drawHeader(doc, 'Incident Investigation Report'); drawFooter(doc); y = 88;
+          }
+
+          // Left sig box
+          doc.rect(MARGIN, y + 8, SIG_W, rowH).stroke(COLOR.border);
+          doc.font(FONT.bold).fontSize(9).fillColor(COLOR.midGray).text(left.label, MARGIN + 8, y + 14);
+          doc.font(FONT.regular).fontSize(8).fillColor(COLOR.midGray).text(left.name, MARGIN + 8, y + 26);
+          if (left.dataUrl && left.dataUrl.startsWith('data:image')) {
+            try {
+              const buf = Buffer.from(left.dataUrl.split(',')[1], 'base64');
+              const tmp = `/tmp/sig_${r.id}_${si}.png`;
+              fs.writeFileSync(tmp, buf);
+              doc.image(tmp, MARGIN + 8, y + 38, { width: SIG_W - 16, height: SIG_H - 10, fit: [SIG_W - 16, SIG_H - 10] });
+              try { fs.unlinkSync(tmp); } catch (_) {}
+            } catch (_) {}
+          }
+
+          // Right sig box
+          if (right) {
+            const rx = MARGIN + SIG_W + 20;
+            doc.rect(rx, y + 8, SIG_W, rowH).stroke(COLOR.border);
+            doc.font(FONT.bold).fontSize(9).fillColor(COLOR.midGray).text(right.label, rx + 8, y + 14);
+            doc.font(FONT.regular).fontSize(8).fillColor(COLOR.midGray).text(right.name, rx + 8, y + 26);
+            if (right.dataUrl && right.dataUrl.startsWith('data:image')) {
+              try {
+                const buf = Buffer.from(right.dataUrl.split(',')[1], 'base64');
+                const tmp = `/tmp/sig_${r.id}_${si + 1}.png`;
+                fs.writeFileSync(tmp, buf);
+                doc.image(tmp, rx + 8, y + 38, { width: SIG_W - 16, height: SIG_H - 10, fit: [SIG_W - 16, SIG_H - 10] });
+                try { fs.unlinkSync(tmp); } catch (_) {}
+              } catch (_) {}
+            }
+          }
+
+          y += rowH + 16;
+        }
+
+        doc.flushPages();
+        doc.end();
+        stream.on('finish', resolve);
+        stream.on('error', reject);
+      });
+    }
+
+    // Store PDF in document library
+    let docId = r.document_id || null;
+    try {
+      if (!docId) {
+        const { rows: docRows } = await db.query(`
+          INSERT INTO documents (folder_id, title, description, created_by)
+          VALUES ($1, $2, $3, $4) RETURNING id
+        `, [
+          INCIDENT_FOLDER_ID,
+          `Incident Investigation #${r.id} — ${r.employee_name || 'Unknown'} — ${r.incident_date || ''}`,
+          `${r.department || ''} | ${r.location || ''} | Investigator: ${r.investigator_name || ''}`,
+          r.submitted_by,
+        ]);
+        docId = docRows[0].id;
+      }
+      await db.query(`
+        INSERT INTO document_versions (document_id, version_number, file_path, file_type, uploaded_by, change_comment)
+        VALUES ($1, 1, $2, 'application/pdf', $3, 'Final PDF — Investigation Closed')
+      `, [docId, `/data/documents/incidents/${pdfName}`, r.submitted_by]);
+    } catch (docErr) {
+      console.error('Error storing PDF in document library:', docErr);
+    }
+
+    // Mark closed + store pdf path
+    const { rows: closed } = await db.query(
+      `UPDATE incident_investigations SET status = 'CLOSED', pdf_path = $1, document_id = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,
+      [pdfPath, docId, r.id]
+    );
+
+    res.json({ success: true, incident: closed[0], pdf_path: pdfPath });
   } catch (err) {
     console.error('Error closing incident:', err);
     res.status(500).json({ error: 'Failed to close investigation' });
