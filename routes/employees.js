@@ -29,6 +29,22 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET LEADERS ONLY (site_admin = true) — must be before /:employee_id
+router.get("/leaders", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT employee_id, name, email
+       FROM employees
+       WHERE site_admin = true AND (active IS NULL OR active = true)
+       ORDER BY name ASC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching leaders:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // ADD EMPLOYEE
 router.post("/", async (req, res) => {
   try {
@@ -133,18 +149,3 @@ router.delete("/:employee_id", async (req, res) => {
 });
 
 module.exports = router;
-// GET LEADERS ONLY (site_admin = true)
-router.get("/leaders", async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT employee_id, name, email
-       FROM employees
-       WHERE site_admin = true AND (active IS NULL OR active = true)
-       ORDER BY name ASC`
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Error fetching leaders:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});

@@ -128,6 +128,50 @@ router.get('/employee-lookup/:employeeId', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────
+// GET /api/incidents/open  — must be before /:id
+// Returns all OPEN/IN_PROGRESS investigations
+// ─────────────────────────────────────────────────────────────────
+router.get('/open', async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT id, employee_name, department, incident_date, report_date,
+             status, created_at, investigator_name, supervisor
+      FROM incident_investigations
+      WHERE status IN ('OPEN','IN_PROGRESS')
+      ORDER BY created_at DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching open incidents:', err);
+    res.status(500).json({ error: 'Failed to fetch open incidents' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// GET /api/incidents/:id/full  — must be before /:id
+// Returns full investigation record for editing/joining
+// ─────────────────────────────────────────────────────────────────
+router.get('/:id/full', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM incident_investigations WHERE id = $1`, [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const record = rows[0];
+    if (typeof record.incident_types === 'string') {
+      try { record.incident_types = JSON.parse(record.incident_types); } catch { record.incident_types = []; }
+    }
+    if (typeof record.photos === 'string') {
+      try { record.photos = JSON.parse(record.photos); } catch { record.photos = []; }
+    }
+    res.json(record);
+  } catch (err) {
+    console.error('Error fetching incident full:', err);
+    res.status(500).json({ error: 'Failed to fetch incident' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
 // GET /api/incidents/:id
 // ─────────────────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
@@ -461,51 +505,6 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error updating incident:', err);
     res.status(500).json({ error: 'Failed to update' });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────
-// GET /api/incidents/open
-// Returns all OPEN incident investigation sessions (not closed/submitted)
-// ─────────────────────────────────────────────────────────────────
-router.get('/open', async (req, res) => {
-  try {
-    const { rows } = await db.query(`
-      SELECT id, employee_name, department, incident_date, report_date,
-             status, created_at, investigator_name, supervisor
-      FROM incident_investigations
-      WHERE status IN ('OPEN','IN_PROGRESS')
-      ORDER BY created_at DESC
-    `);
-    res.json(rows);
-  } catch (err) {
-    console.error('Error fetching open incidents:', err);
-    res.status(500).json({ error: 'Failed to fetch open incidents' });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────
-// GET /api/incidents/:id/full
-// Returns one full investigation record for editing/joining
-// ─────────────────────────────────────────────────────────────────
-router.get('/:id/full', async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `SELECT * FROM incident_investigations WHERE id = $1`, [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    const record = rows[0];
-    // Parse JSON fields if stored as strings
-    if (typeof record.incident_types === 'string') {
-      try { record.incident_types = JSON.parse(record.incident_types); } catch { record.incident_types = []; }
-    }
-    if (typeof record.photos === 'string') {
-      try { record.photos = JSON.parse(record.photos); } catch { record.photos = []; }
-    }
-    res.json(record);
-  } catch (err) {
-    console.error('Error fetching incident full:', err);
-    res.status(500).json({ error: 'Failed to fetch incident' });
   }
 });
 
