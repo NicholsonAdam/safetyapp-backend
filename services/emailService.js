@@ -4,7 +4,8 @@ const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtpmail.mohawkind.com",
   port: parseInt(process.env.SMTP_PORT) || 25,
   secure: process.env.SMTP_SECURE === "true",
-  requireTLS: process.env.SMTP_REQUIRE_TLS === "true",
+  // opportunistic TLS — upgrade if the server offers it, but don't hard-fail if it doesn't
+  opportunisticTLS: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
@@ -33,10 +34,16 @@ function buildEmailTemplate(title, messageBody) {
 
 exports.sendEmail = async (to, subject, messageBody) => {
   const htmlContent = buildEmailTemplate(subject, messageBody);
-  await transporter.sendMail({
-    from: process.env.SMTP_USER,
-    to,
-    subject,
-    html: htmlContent
-  });
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to,
+      subject,
+      html: htmlContent
+    });
+    console.log(`[EMAIL] Sent to ${to} | messageId: ${info.messageId}`);
+  } catch (err) {
+    console.error(`[EMAIL] Failed to send to ${to} | ${err.code || ""} ${err.message}`);
+    throw err;
+  }
 };
