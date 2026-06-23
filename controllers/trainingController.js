@@ -119,7 +119,7 @@ exports.getReportDetails = async (req, res) => {
 
     if (r.type === "PLANT_MEETING") {
       const employees = await db.query(
-        `SELECT employee_id, name FROM employees ORDER BY employee_id`
+        `SELECT employee_id, name FROM employees WHERE active = true ORDER BY employee_id`
       );
       const scans = await db.query(
         `SELECT employee_id FROM attendance_scans WHERE attendance_session_id = $1`,

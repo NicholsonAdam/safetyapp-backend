@@ -26,7 +26,7 @@ async function getFilteredActionItems(filters = {}) {
     params.push(status);
     query += ` AND status = $${params.length}`;
   } else if (hide_complete) {
-    query += ` AND status != 'COMPLETE'`;
+    query += ` AND status NOT IN ('COMPLETE', 'DUPLICATE_SUBMISSION')`;
   }
   if (department) {
     params.push(department);
