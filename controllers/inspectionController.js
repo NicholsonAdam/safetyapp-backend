@@ -125,11 +125,11 @@ const getInspectionById = async (req, res) => {
 // =========================
 const updateInspectionStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, closing_remarks } = req.body;
 
     const result = await pool.query(
-      "UPDATE inspection_checklists SET status = $1 WHERE id = $2 RETURNING *;",
-      [status, req.params.id]
+      "UPDATE inspection_checklists SET status = $1, closing_remarks = $2 WHERE id = $3 RETURNING *;",
+      [status, closing_remarks ?? null, req.params.id]
     );
 
     res.json(result.rows[0]);

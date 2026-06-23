@@ -44,14 +44,14 @@ exports.createBBS = async (req, res) => {
 exports.updateBBSStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, closing_remarks } = req.body;
 
     const result = await pool.query(
       `UPDATE bbs_observations
-       SET status = $1
-       WHERE id = $2
+       SET status = $1, closing_remarks = $2
+       WHERE id = $3
        RETURNING *`,
-      [status, id]
+      [status, closing_remarks ?? null, id]
     );
 
     res.json(result.rows[0]);

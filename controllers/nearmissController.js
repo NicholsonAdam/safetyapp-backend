@@ -128,7 +128,7 @@ exports.updateNearMiss = async (req, res) => {
     const {
       department, location, date, additionalTeam,
       description, actionsTaken, suggestion,
-      followup, status, shift
+      followup, status, shift, closing_remarks
     } = req.body;
 
     const normalizedTypes = normalizeReportTypes(req.body.reportTypes);
@@ -141,14 +141,15 @@ exports.updateNearMiss = async (req, res) => {
         actions_taken = $7, suggestion = $8, followup = $9,
         status = $10, shift = $11,
         photo_path = COALESCE($12, photo_path),
+        closing_remarks = $13,
         updated_at = NOW()
-      WHERE id = $13
+      WHERE id = $14
       RETURNING *`,
       [
         department, location, date, additionalTeam,
         JSON.stringify(normalizedTypes), description,
         actionsTaken, suggestion, followup,
-        status, shift, photoPath, req.params.id
+        status, shift, photoPath, closing_remarks ?? null, req.params.id
       ]
     );
 
