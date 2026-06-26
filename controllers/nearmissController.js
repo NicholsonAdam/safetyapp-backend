@@ -1,5 +1,6 @@
 const pool = require("../config/db");
-const { sendEmail } = require("../services/emailService");
+const { sendEmail }         = require("../services/emailService");
+const { sendPushToEmployee } = require("../services/pushService");
 
 const SAFETY_TEAM_IDS = process.env.SAFETY_ADMIN_ID
   ? [process.env.SAFETY_ADMIN_ID, "245177", "123850"]
@@ -91,6 +92,21 @@ exports.createNearMiss = async (req, res) => {
       } catch (emailErr) {
         console.error("Near Miss follow-up email failed:", emailErr);
       }
+    }
+
+    // Push notification to safety team when follow-up requested
+    if (followup === "yes") {
+      try {
+        const push = {
+          title: "Near Miss — Follow-Up Required",
+          body:  `${observer_name} submitted a near miss in ${department} requiring follow-up.`,
+          url:   "/admin/nearmiss",
+          tag:   `nearmiss-${saved.id}`,
+        };
+        for (const id of SAFETY_TEAM_IDS) {
+          sendPushToEmployee(id, push).catch(() => {});
+        }
+      } catch {}
     }
 
     res.json(saved);

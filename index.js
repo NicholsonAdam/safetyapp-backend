@@ -70,6 +70,11 @@ try {
 } catch (err) {
   console.error("Failed to load fridaySubmissionReportCron:", err);
 }
+try {
+  require('./cron/mondayActionItemsCron');
+} catch (err) {
+  console.error("Failed to load mondayActionItemsCron:", err);
+}
 
 const PORT = process.env.PORT || 3000;
 
@@ -113,6 +118,7 @@ app.use('/api/gemba', require('./routes/gemba'));
 app.use('/api/incidents', require('./routes/incidents'));
 app.use('/api/training-registry', require('./routes/trainingRegistry'));
 app.use('/api/admin',            require('./routes/adminCronTrigger'));
+app.use('/api/push',             require('./routes/pushSubscriptions'));
 
 // GENERIC /api ROUTES LAST
 app.use('/api',                                 healthcheckRoute);
