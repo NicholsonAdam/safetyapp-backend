@@ -21,7 +21,7 @@ router.post("/login", async (req, res) => {
 
     const result = await pool.query(
       `SELECT employee_id, name, department, job_title, email, site_admin,
-              leader_id, active, password_hash, must_change_password,
+              leader_id, shift, facility, active, password_hash, must_change_password,
               failed_attempts, last_failed_attempt
        FROM employees
        WHERE employee_id = $1`,
@@ -100,7 +100,9 @@ router.post("/login", async (req, res) => {
         job_title:   emp.job_title,
         email:       emp.email,
         site_admin:  emp.site_admin,
-        leader_id:   emp.leader_id
+        leader_id:   emp.leader_id,
+        shift:       emp.shift,
+        facility:    emp.facility || "MUSKOGEE",
       }
     });
 
