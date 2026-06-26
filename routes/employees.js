@@ -74,16 +74,17 @@ router.put("/:employee_id", async (req, res) => {
     const { employee_id } = req.params;
     const {
       name, department, job_title, shift,
-      leader_id, email, site_admin, active
+      leader_id, email, site_admin, active, facility
     } = req.body;
 
     const result = await pool.query(
       `UPDATE employees
        SET name=$1, department=$2, job_title=$3, shift=$4,
-           leader_id=$5, email=$6, site_admin=$7, active=$8
-       WHERE employee_id=$9
+           leader_id=$5, email=$6, site_admin=$7, active=$8,
+           facility=$9
+       WHERE employee_id=$10
        RETURNING *`,
-      [name, department, job_title, shift, leader_id, email, site_admin, active, employee_id]
+      [name, department, job_title, shift, leader_id, email, site_admin, active, facility ?? "MUSKOGEE", employee_id]
     );
 
     if (result.rows.length === 0) {
