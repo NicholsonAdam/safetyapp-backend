@@ -1,14 +1,37 @@
-const nodemailer = require('nodemailer');
+const EMAIL_FROM = process.env.EMAIL_FROM || 'muskogeeautomation@daltile.com';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+// In-memory token cache — reused across calls, refreshed 1 min before expiry
+let tokenCache = { token: null, expiresAt: 0 };
+
+async function getAccessToken() {
+  if (tokenCache.token && Date.now() < tokenCache.expiresAt - 60000) {
+    return tokenCache.token;
   }
-});
+
+  const url = `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type:    'client_credentials',
+    client_id:     process.env.AZURE_CLIENT_ID,
+    client_secret: process.env.AZURE_CLIENT_SECRET,
+    scope:         'https://graph.microsoft.com/.default',
+  });
+
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:    body.toString(),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OAuth2 token fetch failed: ${text}`);
+  }
+
+  const data = await res.json();
+  tokenCache.token     = data.access_token;
+  tokenCache.expiresAt = Date.now() + data.expires_in * 1000;
+  return tokenCache.token;
+}
 
 function buildEmailTemplate(title, messageBody) {
   return `
@@ -28,17 +51,30 @@ function buildEmailTemplate(title, messageBody) {
 }
 
 exports.sendEmail = async (to, subject, messageBody) => {
+  const token       = await getAccessToken();
   const htmlContent = buildEmailTemplate(subject, messageBody);
-  try {
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to,
-      subject,
-      html: htmlContent
-    });
-    console.log(`[EMAIL] Sent to ${to} | messageId: ${info.messageId}`);
-  } catch (err) {
-    console.error(`[EMAIL] Failed to send to ${to} | ${err.code || ""} ${err.message}`);
-    throw err;
+
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${EMAIL_FROM}/sendMail`, {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      message: {
+        subject,
+        body:         { contentType: 'HTML', content: htmlContent },
+        toRecipients: [{ emailAddress: { address: to } }],
+      },
+      saveToSentItems: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`[EMAIL] Failed to ${to}: ${text}`);
+    throw new Error(`Graph API sendMail failed: ${text}`);
   }
+
+  console.log(`[EMAIL] Sent to ${to} via Graph API`);
 };
